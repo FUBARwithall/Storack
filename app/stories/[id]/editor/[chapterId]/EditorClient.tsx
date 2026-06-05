@@ -1,0 +1,428 @@
+"use client";
+
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useEditor, EditorContent } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import Underline from '@tiptap/extension-underline'
+import Placeholder from '@tiptap/extension-placeholder'
+import Image from '@tiptap/extension-image'
+
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+
+import {
+    ArrowLeft,
+    Save,
+    Settings,
+    MoreVertical,
+    Bold,
+    Italic,
+    Underline as UnderlineIcon,
+    List,
+    AlignLeft,
+    Image as ImageIcon,
+    Loader2,
+    Check,
+    AlertCircle
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { createChapter, updateChapter, deleteChapter } from "@/lib/actions";
+import { cn } from "@/lib/utils";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+interface EditorClientProps {
+    story: { id: string; title: string; worldId: string; chapters: any[] };
+    chapter: {
+        id: string;
+        title: string;
+        content: string | null;
+        wordCount: number;
+        status: string;
+        order: number
+    };
+}
+
+export function EditorClient({ story, chapter: initialChapter }: EditorClientProps) {
+    const router = useRouter();
+    const [title, setTitle] = useState(initialChapter.title);
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+    const [wordCount, setWordCount] = useState(initialChapter.wordCount);
+    const [hasChanges, setHasChanges] = useState(false);
+    const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const editor = useEditor({
+        extensions: [
+            StarterKit,
+            Underline,
+            Image,
+            Placeholder.configure({
+                placeholder: 'Once upon a time...',
+            }),
+        ],
+        immediatelyRender: false,
+        content: initialChapter.content || "",
+        editorProps: {
+            attributes: {
+                class: 'prose prose-lg dark:prose-invert focus:outline-none max-w-none flex-1 w-full min-h-[500px] font-serif text-justify',
+            },
+            handleKeyDown: (view, event) => {
+                if (event.key === 'Tab') {
+                    event.preventDefault();
+                    if (editor?.isActive('bulletList') || editor?.isActive('orderedList')) {
+                        return false;
+                    }
+                    editor?.commands.insertContent('\u00A0\u00A0\u00A0\u00A0');
+                    return true;
+                }
+                return false;
+            },
+        },
+        onUpdate: ({ editor }) => {
+            const html = editor.getHTML();
+            const text = editor.getText();
+
+            setHasChanges(title !== initialChapter.title || html !== (initialChapter.content || ""));
+
+            const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+            setWordCount(words);
+        },
+    });
+
+    // Handle title changes for hasChanges
+    useEffect(() => {
+        if (editor) {
+            const html = editor.getHTML();
+            setHasChanges(title !== initialChapter.title || html !== (initialChapter.content || ""));
+        }
+    }, [title, editor, initialChapter]);
+
+    const handleSave = useCallback(async () => {
+        if (isSaving || !editor) return;
+
+        setIsSaving(true);
+        setSaveStatus('saving');
+
+        const content = editor.getHTML();
+
+        try {
+            if (initialChapter.id === 'new') {
+                const newChapter = await createChapter(story.id, story.worldId, {
+                    title: title,
+                    order: story.chapters.length + 1
+                });
+
+                await updateChapter(newChapter.id, {
+                    content: content,
+                    wordCount: wordCount
+                });
+
+                router.push(`/stories/${story.id}/editor/${newChapter.id}`);
+            } else {
+                await updateChapter(initialChapter.id, {
+                    title: title,
+                    content: content,
+                    wordCount: wordCount
+                });
+                router.refresh();
+            }
+            setSaveStatus('saved');
+            setHasChanges(false);
+            setTimeout(() => setSaveStatus('idle'), 3000);
+        } catch (error) {
+            console.error(error);
+            setSaveStatus('error');
+        } finally {
+            setIsSaving(false);
+        }
+    }, [isSaving, initialChapter.id, story.id, story.worldId, story.chapters.length, title, wordCount, router, editor]);
+
+    // Autosave — debounce 2 detik setelah ada perubahan
+    useEffect(() => {
+        if (!hasChanges || isSaving || initialChapter.id === 'new') return;
+
+        if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+
+        autosaveTimer.current = setTimeout(() => {
+            handleSave();
+        }, 2000);
+
+        return () => {
+            if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+        };
+    }, [hasChanges, isSaving, initialChapter.id, handleSave]);
+
+    const handleDelete = useCallback(async () => {
+        if (initialChapter.id === 'new') {
+            router.push(`/stories/${story.id}`);
+            return;
+        }
+
+        if (!confirm("Are you sure you want to delete this chapter? This action cannot be undone.")) {
+            return;
+        }
+
+        try {
+            await deleteChapter(initialChapter.id, story.id);
+            router.push(`/stories/${story.id}`);
+            router.refresh();
+        } catch (error) {
+            console.error("Failed to delete chapter:", error);
+            alert("Failed to delete chapter. Please try again.");
+        }
+    }, [initialChapter.id, router, story.id]);
+
+    // Keyboard Shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey)) {
+                if (e.key.toLowerCase() === 's') {
+                    e.preventDefault();
+                    handleSave();
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [handleSave]);
+
+    if (!editor) {
+        return null;
+    }
+
+    return (
+        <div className="flex flex-col h-screen bg-background font-sans">
+            <style dangerouslySetInnerHTML={{
+                __html: `
+                .ProseMirror p.is-editor-empty:first-child::before {
+                    content: attr(data-placeholder);
+                    float: left;
+                    color: #adb5bd;
+                    pointer-events: none;
+                    height: 0;
+                }
+                .ProseMirror {
+                    min-height: 300px;
+                    padding-bottom: 50px;
+                    white-space: pre-wrap;
+                }
+                .ProseMirror p {
+                    text-align: justify;
+                }
+                .ProseMirror strong { font-weight: bold; }
+                .ProseMirror em { font-style: italic; }
+                .ProseMirror u { text-decoration: underline; }
+                .ProseMirror ul { list-style-type: disc; padding-left: 1.5em; }
+                .ProseMirror ol { list-style-type: decimal; padding-left: 1.5em; }
+            `}} />
+
+            {/* Editor Header */}
+            <header className="flex h-16 items-center justify-between border-b px-6 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-20">
+                <div className="flex items-center gap-4 flex-1">
+                    <Link href={`/stories/${story.id}`} className="text-muted-foreground hover:text-foreground transition-colors p-2 hover:bg-muted rounded-full">
+                        <ArrowLeft className="h-5 w-5" />
+                    </Link>
+                    <div className="flex-1 min-w-0">
+                        <input
+                            type="text"
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            className="bg-transparent border-none text-sm font-semibold text-foreground focus:ring-0 p-0 w-full placeholder:text-muted-foreground/50"
+                            placeholder="Chapter Title"
+                        />
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium truncate">{story.title}</p>
+                    </div>
+
+                    {hasChanges && saveStatus === 'idle' && (
+                        <span className="hidden md:flex items-center gap-1.5 rounded-full bg-yellow-500/10 px-2.5 py-1 text-[10px] font-medium text-yellow-600 dark:text-yellow-400 border border-yellow-500/20">
+                            <span className="h-1.5 w-1.5 rounded-full bg-yellow-500 animate-pulse" />
+                            Unsaved changes
+                        </span>
+                    )}
+
+                    {saveStatus === 'saving' && (
+                        <span className="hidden md:flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-medium text-primary border border-primary/20">
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            Saving...
+                        </span>
+                    )}
+
+                    {saveStatus === 'saved' && (
+                        <span className="hidden md:flex items-center gap-1.5 rounded-full bg-green-500/10 px-2.5 py-1 text-[10px] font-medium text-green-600 dark:text-green-400 border border-green-500/20">
+                            <Check className="h-3 w-3" />
+                            Changes saved
+                        </span>
+                    )}
+
+                    {saveStatus === 'error' && (
+                        <span className="hidden md:flex items-center gap-1.5 rounded-full bg-destructive/10 px-2.5 py-1 text-[10px] font-medium text-destructive border border-destructive/20">
+                            <AlertCircle className="h-3 w-3" />
+                            Save failed
+                        </span>
+                    )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                    <span className="hidden sm:block text-[11px] font-medium text-muted-foreground border-r pr-4 mr-2">{wordCount.toLocaleString()} WORDS</span>
+
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-9 w-9">
+                                <Settings className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                            <DropdownMenuLabel>Chapter Settings</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="flex justify-between">
+                                <span>Status</span>
+                                <span className="text-xs text-muted-foreground">{initialChapter.status}</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="flex justify-between">
+                                <span>Order</span>
+                                <span className="text-xs text-muted-foreground">Chapter {initialChapter.order}</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={handleDelete}
+                            >
+                                Delete Chapter
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    <Button
+                        size="sm"
+                        onClick={handleSave}
+                        disabled={!hasChanges || isSaving}
+                        className={cn(
+                            "gap-2 transition-all duration-300",
+                            hasChanges ? "shadow-md bg-primary hover:bg-primary/90" : "bg-muted text-muted-foreground hover:bg-muted"
+                        )}
+                    >
+                        {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                        Save
+                    </Button>
+
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-9 w-9">
+                                <MoreVertical className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem>Export as TXT</DropdownMenuItem>
+                            <DropdownMenuItem>Export as PDF</DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem>Focus Mode</DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            </header>
+
+            {/* Editor Toolbar */}
+            <div className="flex items-center justify-center gap-2 border-b bg-muted/30 p-2 z-10 sticky top-16">
+                <div className="flex items-center rounded-lg bg-background shadow-sm border p-0.5">
+                    <ToolbarButton
+                        icon={Bold}
+                        label="Bold"
+                        active={editor.isActive('bold')}
+                        onClick={() => editor.chain().focus().toggleBold().run()}
+                    />
+                    <ToolbarButton
+                        icon={Italic}
+                        label="Italic"
+                        active={editor.isActive('italic')}
+                        onClick={() => editor.chain().focus().toggleItalic().run()}
+                    />
+                    <ToolbarButton
+                        icon={UnderlineIcon}
+                        label="Underline"
+                        active={editor.isActive('underline')}
+                        onClick={() => editor.chain().focus().toggleUnderline().run()}
+                    />
+                    <div className="mx-1.5 h-4 w-px bg-border/60" />
+                    <ToolbarButton
+                        icon={AlignLeft}
+                        label="Clear Text"
+                        onClick={() => editor.chain().focus().clearContent().run()}
+                    />
+                    <ToolbarButton
+                        icon={List}
+                        label="Bullet List"
+                        active={editor.isActive('bulletList')}
+                        onClick={() => editor.chain().focus().toggleBulletList().run()}
+                    />
+                    <div className="mx-1.5 h-4 w-px bg-border/60" />
+                    <ToolbarButton
+                        icon={ImageIcon}
+                        label="Insert Image"
+                        onClick={() => {
+                            const url = window.prompt('URL');
+                            if (url) {
+                                editor.chain().focus().setImage({ src: url }).run();
+                            }
+                        }}
+                    />
+                </div>
+            </div>
+
+            <main
+                className="flex-1 overflow-y-auto bg-background selection:bg-primary/20 flex flex-col"
+                onClick={() => editor.commands.focus()}
+            >
+                <div className="w-full py-16 flex-1 flex flex-col bg-white">
+                    <div className="max-w-3xl mx-auto w-full">
+                        <EditorContent editor={editor} className="flex-1" />
+                    </div>
+                </div>
+            </main>
+
+            {/* Footer / Status Bar */}
+            <footer className="h-8 border-t bg-muted/10 px-4 flex items-center justify-between text-[10px] text-muted-foreground font-medium uppercase tracking-tighter">
+                <div className="flex items-center gap-4">
+                    <span>Draft Mode</span>
+                    <span>Spellcheck: On</span>
+                    {hasChanges && saveStatus === 'idle' && !isSaving && (
+                        <span className="text-yellow-500">Autosave in 2s...</span>
+                    )}
+                    {saveStatus === 'saving' && (
+                        <span className="text-primary">Autosaving...</span>
+                    )}
+                </div>
+                <div>
+                    Storack Editor v1.0
+                </div>
+            </footer>
+        </div>
+    );
+}
+
+function ToolbarButton({ icon: Icon, label, onClick, active }: { icon: any, label: string, onClick?: () => void, active?: boolean }) {
+    return (
+        <Button
+            variant="ghost"
+            size="icon"
+            title={label}
+            onMouseDown={(e) => {
+                e.preventDefault();
+                onClick?.();
+            }}
+            className={cn(
+                "h-8 w-8 rounded-md transition-colors",
+                active ? "bg-muted text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            )}
+        >
+            <Icon className="h-4 w-4" />
+        </Button>
+    );
+}
