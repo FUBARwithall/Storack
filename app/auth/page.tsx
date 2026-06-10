@@ -6,68 +6,59 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BookOpen, Lock, User, Sparkles, Wand2 } from "lucide-react";
+import { toast } from "sonner";
 import { loginAction, registerAction } from "@/lib/auth-actions";
+import authBg from "@/public/auth-bg.png";
 
 export default function AuthPage() {
     const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
 
     async function handleSubmit(e: React.FormEvent<HTMLFormElement>, action: (formData: FormData) => Promise<any>) {
         e.preventDefault();
         setIsLoading(true);
-        setError(null);
 
         const formData = new FormData(e.currentTarget);
         const result = await action(formData);
 
         if (result?.error) {
-            setError(result.error);
+            toast.error(result.error);
             setIsLoading(false);
         }
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900 via-slate-900 to-black p-4">
-            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-20 pointer-events-none"></div>
+        <div className="min-h-screen flex items-center justify-center bg-cover bg-center bg-no-repeat p-4 relative" style={{ backgroundImage: `url(${authBg.src})` }}>
 
             <div className="w-full max-w-md space-y-6 animate-in fade-in zoom-in duration-500">
                 <div className="text-center space-y-1">
-                    <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-500/10 border border-indigo-500/20 mb-3 backdrop-blur-sm shadow-xl shadow-indigo-500/10">
-                        <BookOpen className="h-7 w-7 text-indigo-400" />
-                    </div>
                     <h1 className="text-4xl font-extrabold tracking-tight text-white sm:text-5xl">
-                        Stor<span className="text-indigo-400">ack</span>
+                        Sto<span className="text-indigo-400">rack</span>
                     </h1>
                     <p className="text-indigo-200/60 font-medium">Capture your world, one word at a time.</p>
                 </div>
 
-                <Card className="border-white/10 bg-slate-900/50 backdrop-blur-xl shadow-2xl overflow-hidden mt-2">
+                <Card className="border-white/10 bg-slate-900/50 backdrop-blur-xl shadow-2xl overflow-hidden pt-2">
                     <Tabs defaultValue="login" className="w-full">
-                        <TabsList className="grid w-full grid-cols-2 rounded-none bg-black/40 h-12 p-1">
+                        <TabsList variant="line" className="grid w-full grid-cols-2 rounded-none border-b border-white/10 h-12 p-0 bg-transparent">
                             <TabsTrigger
                                 value="login"
-                                className="rounded-md data-[state=active]:bg-indigo-500 data-[state=active]:text-white transition-all duration-300"
+                                className="data-[state=active]:text-indigo-400 text-slate-400 after:bg-indigo-500 after:!-bottom-[3px] font-semibold transition-all duration-200"
                             >
                                 Login
                             </TabsTrigger>
                             <TabsTrigger
                                 value="register"
-                                className="rounded-md data-[state=active]:bg-indigo-500 data-[state=active]:text-white transition-all duration-300"
+                                className="data-[state=active]:text-indigo-400 text-slate-400 after:bg-indigo-500 after:!-bottom-[3px] font-semibold transition-all duration-200"
                             >
                                 Register
                             </TabsTrigger>
                         </TabsList>
 
                         <div className="p-1">
-                            {error && (
-                                <div className="mt-4 mx-6 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-medium animate-in slide-in-from-top-2">
-                                    {error}
-                                </div>
-                            )}
 
                             <TabsContent value="login">
                                 <form onSubmit={(e) => handleSubmit(e, loginAction)}>
-                                    <CardHeader className="pt-6 px-6 pb-2">
+                                    <CardHeader className="pt-4">
                                         <CardTitle className="text-white text-xl">Welcome Back</CardTitle>
                                         <CardDescription className="text-slate-400 text-xs">Enter your credentials to access your library.</CardDescription>
                                     </CardHeader>
@@ -96,7 +87,7 @@ export default function AuthPage() {
                                             </div>
                                         </div>
                                     </CardContent>
-                                    <CardFooter className="px-6 pb-6 pt-2">
+                                    <CardFooter>
                                         <Button
                                             type="submit"
                                             className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold h-10 shadow-lg shadow-indigo-600/20 transition-all text-sm"
@@ -105,7 +96,7 @@ export default function AuthPage() {
                                             {isLoading ? (
                                                 <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                                             ) : (
-                                                <>Sign In <Sparkles className="ml-2 h-4 w-4 opacity-70" /></>
+                                                <>Sign In</>
                                             )}
                                         </Button>
                                     </CardFooter>
@@ -114,7 +105,7 @@ export default function AuthPage() {
 
                             <TabsContent value="register">
                                 <form onSubmit={(e) => handleSubmit(e, registerAction)}>
-                                    <CardHeader className="pt-6 px-6 pb-2">
+                                    <CardHeader className="pt-4">
                                         <CardTitle className="text-white text-xl">Create Account</CardTitle>
                                         <CardDescription className="text-slate-400 text-xs text-balance">Start your creative journey today.</CardDescription>
                                     </CardHeader>
@@ -143,7 +134,7 @@ export default function AuthPage() {
                                             </div>
                                         </div>
                                     </CardContent>
-                                    <CardFooter className="px-6 pb-6 pt-2">
+                                    <CardFooter>
                                         <Button
                                             type="submit"
                                             className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold h-10 shadow-lg shadow-indigo-600/20 transition-all text-sm"
@@ -152,7 +143,7 @@ export default function AuthPage() {
                                             {isLoading ? (
                                                 <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                                             ) : (
-                                                <>Begin Adventure <Wand2 className="ml-2 h-4 w-4 opacity-70" /></>
+                                                <>Begin Adventure</>
                                             )}
                                         </Button>
                                     </CardFooter>
