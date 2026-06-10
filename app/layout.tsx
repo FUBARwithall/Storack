@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Lora, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import LayoutWrapper from "./components/layouts/LayoutWrapper";
 
@@ -10,6 +10,16 @@ const geistSans = Geist({
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+const lora = Lora({
+  variable: "--font-lora",
+  subsets: ["latin"],
+});
+
+const playfair = Playfair_Display({
+  variable: "--font-playfair",
   subsets: ["latin"],
 });
 
@@ -33,7 +43,7 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning className="h-full overflow-hidden">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased h-full flex bg-background text-foreground overflow-hidden`}
+        className={`${geistSans.variable} ${geistMono.variable} ${lora.variable} ${playfair.variable} antialiased h-full flex bg-background text-foreground overflow-hidden`}
       >
         <ThemeProvider
           attribute="class"

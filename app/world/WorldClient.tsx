@@ -197,7 +197,7 @@ export function WorldClient({ initialLocations, initialCharacters, worldId }: Wo
                     {filteredItems.map((item) => (
                         <div
                             key={`${item.sourceType}-${item.id}`}
-                            className="group flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-muted/40 bg-card/60 backdrop-blur-sm p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:border-primary/30 hover:bg-card/80"
+                            className="group flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-border bg-card/60 backdrop-blur-sm p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:border-primary/30 hover:bg-card/80"
                         >
                             <div className="flex items-start gap-5">
                                 <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-secondary text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors duration-300 shadow-inner overflow-hidden">
@@ -210,7 +210,7 @@ export function WorldClient({ initialLocations, initialCharacters, worldId }: Wo
                                 <div className="pl-6">
                                     <div className="flex items-center gap-3">
                                         <h3 className="text-lg font-bold text-foreground group-hover:text-primary transition-colors">{item.name}</h3>
-                                        <span className="rounded-full bg-secondary/80 border border-muted px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground whitespace-nowrap">
+                                        <span className="rounded-full bg-secondary/80 border border-muted px-2.5 py-0.5 text-xs font-bold uppercase tracking-widest text-muted-foreground whitespace-nowrap">
                                             {item.type || 'Entry'}
                                         </span>
                                     </div>

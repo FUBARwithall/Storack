@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from 'next-themes';
+import { usePathname } from 'next/navigation';
 import {
     Avatar,
     AvatarFallback,
@@ -53,27 +54,40 @@ export function Sidebar({
 }) {
 
     const { setTheme } = useTheme();
+    const pathname = usePathname();
 
     return (
-        <div className={cn("flex h-screen w-64 flex-col border-r bg-sidebar backdrop-blur-sm dark:bg-zinc-950", className)}>
+        <div className={cn("flex h-screen w-64 flex-col border-r bg-sidebar backdrop-blur-sm", className)}>
             <div className="flex h-14 items-center border-b px-6 font-semibold">
                 <PenTool className="mr-2 h-5 w-5 text-primary" />
-                <span className="text-lg font-bold tracking-tight">Storack</span>
+                <span className="text-xl font-serif font-bold italic tracking-wide text-foreground">Storack</span>
             </div>
 
             <nav className="flex-1 overflow-y-auto px-4 py-6">
+                <p className="px-3 pb-2 text-[10px] font-bold tracking-widest text-muted-foreground/50 uppercase select-none">Navigation</p>
                 <ul className="space-y-1">
-                    {sidebarItems.map((item) => (
-                        <li key={item.name}>
-                            <Link
-                                href={item.href}
-                                className="group flex items-center rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-                            >
-                                <item.icon className="mr-3 h-5 w-5 flex-shrink-0 opacity-70 group-hover:opacity-100" />
-                                {item.name}
-                            </Link>
-                        </li>
-                    ))}
+                    {sidebarItems.map((item) => {
+                        const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+                        return (
+                            <li key={item.name}>
+                                <Link
+                                    href={item.href}
+                                    className={cn(
+                                        "group flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 border-l-2",
+                                        isActive 
+                                            ? "bg-primary/10 text-primary border-primary font-semibold rounded-l-none pl-2.5" 
+                                            : "text-foreground/65 border-transparent hover:bg-accent/40 hover:text-foreground"
+                                    )}
+                                >
+                                    <item.icon className={cn(
+                                        "mr-3 h-5 w-5 flex-shrink-0 transition-opacity duration-200",
+                                        isActive ? "opacity-100 text-primary" : "opacity-60 group-hover:opacity-100"
+                                    )} />
+                                    {item.name}
+                                </Link>
+                            </li>
+                        );
+                    })}
                 </ul>
             </nav>
 
@@ -83,13 +97,13 @@ export function Sidebar({
                         <Button variant="ghost" className="w-full justify-start gap-3 h-12 px-2 hover:bg-accent/50">
                             <Avatar className="h-8 w-8 rounded-lg border">
                                 <AvatarImage src={user?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username || 'user'}`} alt={user?.username || "User"} />
-                                <AvatarFallback className="rounded-lg bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
+                                <AvatarFallback className="rounded-lg bg-primary/15 text-primary">
                                     {user?.username ? user.username.substring(0, 2).toUpperCase() : 'US'}
                                 </AvatarFallback>
                             </Avatar>
                             <div className="flex flex-col items-start gap-0.5 text-left flex-1 min-w-0">
                                 <span className="text-sm font-semibold truncate w-full">{user?.username || 'Guest User'}</span>
-                                <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wide">
+                                <span className="text-xs text-muted-foreground uppercase font-bold tracking-wide">
                                     {user ? 'Pro Writer' : 'Free Tier'}
                                 </span>
                             </div>

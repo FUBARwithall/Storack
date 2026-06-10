@@ -109,7 +109,7 @@ export function CharactersClient({ initialCharacters, worldId }: CharactersClien
             {filteredCharacters.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in duration-500">
                     {filteredCharacters.map((char) => (
-                        <Card key={char.id} className="group overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border-muted/40 bg-card/60 backdrop-blur-sm py-0 gap-0">
+                        <Card key={char.id} className="group overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border border-border bg-card/60 backdrop-blur-sm py-0 gap-0">
                             <div className="aspect-[4/5] w-full bg-muted flex items-center justify-center relative overflow-hidden">
                                 {char.avatarUrl ? (
                                     // eslint-disable-next-line @next/next/no-img-element

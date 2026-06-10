@@ -63,7 +63,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                             />
                             {story.genre && (
                                 <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm p-1">
-                                    <p className="text-[10px] text-white text-center font-medium truncate uppercase tracking-wider">{story.genre}</p>
+                                    <p className="text-xs text-white text-center font-medium truncate uppercase tracking-wider">{story.genre}</p>
                                 </div>
                             )}
                         </div>
@@ -128,31 +128,36 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                     <TabsList className="bg-transparent h-auto p-0 gap-2 rounded-none border-b-0">
                         <TabsTrigger
                             value="overview"
-                            className="rounded-none border-0 data-[state=active]:bg-transparent dark:data-[state=active]:bg-transparent data-[state=active]:shadow-none py-4 px-4 font-medium transition-all"
+                            className="rounded-none border-none !h-full data-[state=active]:!bg-primary data-[state=active]:!text-primary-foreground data-[state=active]:shadow-none py-4 px-5 font-semibold transition-all"
+                            style={{ border: 'none' }}
                         >
                             Overview
                         </TabsTrigger>
                         <TabsTrigger
                             value="characters"
-                            className="rounded-none border-0 data-[state=active]:bg-transparent dark:data-[state=active]:bg-transparent data-[state=active]:shadow-none py-4 px-4 font-medium transition-all"
+                            className="rounded-none border-none !h-full data-[state=active]:!bg-primary data-[state=active]:!text-primary-foreground data-[state=active]:shadow-none py-4 px-5 font-semibold transition-all"
+                            style={{ border: 'none' }}
                         >
                             Characters
                         </TabsTrigger>
                         <TabsTrigger
                             value="world"
-                            className="rounded-none border-0 data-[state=active]:bg-transparent dark:data-[state=active]:bg-transparent data-[state=active]:shadow-none py-4 px-4 font-medium transition-all"
+                            className="rounded-none border-none !h-full data-[state=active]:!bg-primary data-[state=active]:!text-primary-foreground data-[state=active]:shadow-none py-4 px-5 font-semibold transition-all"
+                            style={{ border: 'none' }}
                         >
                             World
                         </TabsTrigger>
                         <TabsTrigger
                             value="notes"
-                            className="rounded-none border-0 data-[state=active]:bg-transparent dark:data-[state=active]:bg-transparent data-[state=active]:shadow-none py-4 px-4 font-medium transition-all"
+                            className="rounded-none border-none !h-full data-[state=active]:!bg-primary data-[state=active]:!text-primary-foreground data-[state=active]:shadow-none py-4 px-5 font-semibold transition-all"
+                            style={{ border: 'none' }}
                         >
                             Notes
                         </TabsTrigger>
                         <TabsTrigger
                             value="timeline"
-                            className="rounded-none border-0 data-[state=active]:bg-transparent dark:data-[state=active]:bg-transparent data-[state=active]:shadow-none py-4 px-4 font-medium transition-all"
+                            className="rounded-none border-none !h-full data-[state=active]:!bg-primary data-[state=active]:!text-primary-foreground data-[state=active]:shadow-none py-4 px-5 font-semibold transition-all"
+                            style={{ border: 'none' }}
                         >
                             Timeline
                         </TabsTrigger>
@@ -180,19 +185,19 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                                 <div className="space-y-3">
                                     {story.chapters.length > 0 ? (
                                         story.chapters.sort((a, b) => a.order - b.order).map((chapter) => (
-                                            <Card key={chapter.id} className="group hover:border-primary/50 transition-all hover:shadow-sm">
+                                            <Card key={chapter.id} className="group hover:border-primary/50 transition-all duration-300 hover:shadow-md hover:shadow-primary/5 bg-card border-border">
                                                 <CardContent className="flex items-center justify-between p-4">
                                                     <div className="flex items-center gap-4">
-                                                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-xs font-bold text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                                                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary text-xs font-bold text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300">
                                                             {chapter.order}
                                                         </div>
                                                         <div>
-                                                            <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                                                            <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors font-serif text-base">
                                                                 <Link href={`/stories/${story.id}/editor/${chapter.id}`} className="hover:underline">
                                                                     {chapter.title}
                                                                 </Link>
                                                             </h3>
-                                                            <p className="text-xs text-muted-foreground mt-0.5">
+                                                            <p className="text-xs text-muted-foreground mt-0.5 font-body">
                                                                 {chapter.wordCount.toLocaleString()} words • Last edited {formatRelativeTime(chapter.lastEdited)}
                                                             </p>
                                                         </div>
@@ -202,7 +207,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                                                         <Badge
                                                             variant={chapter.status === 'Completed' ? 'default' : 'outline'}
                                                             className={cn(
-                                                                chapter.status === 'Editing' && "border-yellow-500/50 text-yellow-600 bg-yellow-500/5 dark:text-yellow-400"
+                                                                chapter.status === 'Editing' && "border-primary/50 text-primary bg-primary/5 font-semibold"
                                                             )}
                                                         >
                                                             {chapter.status}

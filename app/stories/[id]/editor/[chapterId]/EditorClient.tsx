@@ -377,37 +377,37 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
                             className="bg-transparent border-none text-sm font-semibold text-foreground focus:ring-0 p-0 w-full placeholder:text-muted-foreground/50"
                             placeholder="Chapter Title"
                         />
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium truncate">{story.title}</p>
+                        <p className="text-xs text-muted-foreground uppercase tracking-widest font-medium truncate">{story.title}</p>
                     </div>
 
                 </div>
 
                 <div className="flex items-center gap-2">
                     {hasChanges && saveStatus === 'idle' && (
-                        <span className="hidden md:flex items-center gap-1.5 rounded-full bg-yellow-500/10 px-2.5 py-1 text-[10px] font-medium text-yellow-600 dark:text-yellow-400 border border-yellow-500/20">
+                        <span className="hidden md:flex items-center gap-1.5 rounded-full bg-yellow-500/10 px-2.5 py-1 text-xs font-medium text-yellow-600 dark:text-yellow-400 border border-yellow-500/20">
                             <span className="h-1.5 w-1.5 rounded-full bg-yellow-500 animate-pulse" />
                             Unsaved changes
                         </span>
                     )}
                     {saveStatus === 'saving' && (
-                        <span className="hidden md:flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-medium text-primary border border-primary/20">
+                        <span className="hidden md:flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary border border-primary/20">
                             <Loader2 className="h-3 w-3 animate-spin" />
                             Saving...
                         </span>
                     )}
                     {saveStatus === 'saved' && (
-                        <span className="hidden md:flex items-center gap-1.5 rounded-full bg-green-500/10 px-2.5 py-1 text-[10px] font-medium text-green-600 dark:text-green-400 border border-green-500/20">
+                        <span className="hidden md:flex items-center gap-1.5 rounded-full bg-green-500/10 px-2.5 py-1 text-xs font-medium text-green-600 dark:text-green-400 border border-green-500/20">
                             <Check className="h-3 w-3" />
                             Changes saved
                         </span>
                     )}
                     {saveStatus === 'error' && (
-                        <span className="hidden md:flex items-center gap-1.5 rounded-full bg-destructive/10 px-2.5 py-1 text-[10px] font-medium text-destructive border border-destructive/20">
+                        <span className="hidden md:flex items-center gap-1.5 rounded-full bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive border border-destructive/20">
                             <AlertCircle className="h-3 w-3" />
                             Save failed
                         </span>
                     )}
-                    <span className="hidden sm:block text-[11px] font-medium text-muted-foreground border-r pr-4 mr-2">{wordCount.toLocaleString()} WORDS</span>
+                    <span className="hidden sm:block text-xs font-medium text-muted-foreground border-r pr-4 mr-2">{wordCount.toLocaleString()} WORDS</span>
 
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -750,7 +750,7 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
             </main>
 
             {/* Footer / Status Bar */}
-            <footer className="h-8 border-t bg-muted/10 px-4 flex items-center justify-between text-[10px] text-muted-foreground font-medium uppercase tracking-tighter">
+            <footer className="h-8 border-t bg-muted/10 px-4 flex items-center justify-between text-xs text-muted-foreground font-medium uppercase tracking-tighter">
                 <div className="flex items-center gap-4">
                     <span>Draft Mode</span>
                     <span>Spellcheck: On</span>
