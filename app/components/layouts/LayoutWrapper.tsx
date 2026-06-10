@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Sidebar } from "./Sidebar";
+import { MobileNav, Sidebar } from "./Sidebar";
 
 export default function LayoutWrapper({
     children,
@@ -20,9 +20,12 @@ export default function LayoutWrapper({
     return (
         <div className="flex h-full w-full">
             <Sidebar user={user} className="hidden md:flex border-r border-border" />
-            <main className="flex-1 overflow-y-auto w-full">
-                {children}
-            </main>
+            <div className="flex min-w-0 flex-1 flex-col">
+                <MobileNav user={user} />
+                <main className="flex-1 overflow-y-auto w-full">
+                    {children}
+                </main>
+            </div>
         </div>
     );
 }

@@ -11,6 +11,7 @@ import {
     LogOut,
     User as UserIcon,
     ChevronsUpDown,
+    Menu,
     Palette,
     Sun,
     Moon,
@@ -37,12 +38,25 @@ import {
     DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import {
+    Sheet,
+    SheetClose,
+    SheetContent,
+    SheetHeader,
+    SheetTitle,
+    SheetTrigger,
+} from "@/components/ui/sheet";
 
 const sidebarItems = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'My Stories', href: '/stories', icon: BookOpen },
     { name: 'Characters', href: '/characters', icon: Users },
     { name: 'Worldbuilding', href: '/world', icon: Database },
+];
+
+const accountItems = [
+    { name: 'Profile', href: '/settings', icon: UserIcon },
+    { name: 'Analysis', href: '/analysis', icon: BarChart3 },
 ];
 
 export function Sidebar({
@@ -163,5 +177,136 @@ export function Sidebar({
                 </DropdownMenu>
             </div>
         </div>
+    );
+}
+
+export function MobileNav({
+    user,
+}: {
+    user?: { id: string; username: string; avatarUrl?: string | null } | null;
+}) {
+    const { setTheme } = useTheme();
+    const pathname = usePathname();
+
+    return (
+        <div className="flex h-14 shrink-0 items-center justify-between border-b bg-sidebar px-4 md:hidden">
+            <Link href="/" className="flex items-center font-semibold">
+                <PenTool className="mr-2 h-5 w-5 text-primary" />
+                <span className="text-xl font-serif font-bold italic tracking-wide text-foreground">Storack</span>
+            </Link>
+
+            <Sheet>
+                <SheetTrigger asChild>
+                    <Button variant="ghost" size="icon" aria-label="Open navigation menu">
+                        <Menu className="h-5 w-5" />
+                    </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-[86vw] max-w-sm gap-0 p-0">
+                    <SheetHeader className="border-b p-4 text-left">
+                        <SheetTitle className="flex items-center gap-3">
+                            <Avatar className="h-9 w-9 rounded-lg border">
+                                <AvatarImage src={user?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username || 'user'}`} alt={user?.username || "User"} />
+                                <AvatarFallback className="rounded-lg bg-primary/15 text-primary">
+                                    {user?.username ? user.username.substring(0, 2).toUpperCase() : 'US'}
+                                </AvatarFallback>
+                            </Avatar>
+                            <span className="min-w-0">
+                                <span className="block truncate text-base">{user?.username || 'Guest User'}</span>
+                                <span className="block text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                                    Mobile Workspace
+                                </span>
+                            </span>
+                        </SheetTitle>
+                    </SheetHeader>
+
+                    <div className="flex-1 overflow-y-auto px-4 py-5">
+                        <MobileSectionLabel>Navigation</MobileSectionLabel>
+                        <nav className="space-y-1">
+                            {sidebarItems.map((item) => {
+                                const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+                                return (
+                                    <SheetClose asChild key={item.name}>
+                                        <Link
+                                            href={item.href}
+                                            className={cn(
+                                                "flex min-h-11 items-center rounded-lg px-3 text-sm font-medium transition-colors",
+                                                isActive
+                                                    ? "bg-primary/10 text-primary"
+                                                    : "text-foreground/70 hover:bg-accent/50 hover:text-foreground"
+                                            )}
+                                        >
+                                            <item.icon className="mr-3 h-5 w-5" />
+                                            {item.name}
+                                        </Link>
+                                    </SheetClose>
+                                );
+                            })}
+                        </nav>
+
+                        <div className="mt-6 border-t pt-5">
+                            <MobileSectionLabel>Account</MobileSectionLabel>
+                            <div className="space-y-1">
+                                {accountItems.map((item) => {
+                                    const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+                                    return (
+                                        <SheetClose asChild key={item.name}>
+                                            <Link
+                                                href={item.href}
+                                                className={cn(
+                                                    "flex min-h-11 items-center rounded-lg px-3 text-sm font-medium transition-colors",
+                                                    isActive
+                                                        ? "bg-primary/10 text-primary"
+                                                        : "text-foreground/70 hover:bg-accent/50 hover:text-foreground"
+                                                )}
+                                            >
+                                                <item.icon className="mr-3 h-5 w-5" />
+                                                {item.name}
+                                            </Link>
+                                        </SheetClose>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <div className="mt-6 border-t pt-5">
+                            <MobileSectionLabel>Appearance</MobileSectionLabel>
+                            <div className="grid grid-cols-3 gap-2">
+                                <Button variant="outline" size="sm" onClick={() => setTheme("light")} className="justify-center">
+                                    <Sun className="mr-2 h-4 w-4" /> Light
+                                </Button>
+                                <Button variant="outline" size="sm" onClick={() => setTheme("dark")} className="justify-center">
+                                    <Moon className="mr-2 h-4 w-4" /> Dark
+                                </Button>
+                                <Button variant="outline" size="sm" onClick={() => setTheme("system")} className="justify-center">
+                                    <Laptop className="mr-2 h-4 w-4" /> Auto
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="border-t p-4">
+                        <Button
+                            variant="ghost"
+                            className="min-h-11 w-full justify-start text-destructive hover:text-destructive"
+                            onClick={async () => {
+                                const { logoutAction } = await import("@/lib/auth-actions");
+                                await logoutAction();
+                            }}
+                        >
+                            <LogOut className="mr-3 h-5 w-5" />
+                            Log out
+                        </Button>
+                    </div>
+                </SheetContent>
+            </Sheet>
+        </div>
+    );
+}
+
+function MobileSectionLabel({ children }: { children: React.ReactNode }) {
+    return (
+        <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
+            {children}
+        </p>
     );
 }
