@@ -1,22 +1,23 @@
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
-import { ArrowLeft, Save, Settings, MoreVertical, Bold, Italic, Underline, List, AlignLeft, Image as ImageIcon } from "lucide-react";
 import { notFound } from "next/navigation";
-import { getChapterById, getStoryById, getOrCreateDefaultWorld } from "@/lib/actions";
+import { getChapterById, getStoryById } from "@/lib/actions";
 import { EditorClient } from "./EditorClient";
+
+type EditorChapter = Parameters<typeof EditorClient>[0]["chapter"] & {
+    storyId?: string | null;
+    worldId?: string;
+};
 
 export default async function EditorPage({ params }: { params: Promise<{ id: string; chapterId: string }> }) {
     const { id, chapterId } = await params;
 
     const story = await getStoryById(id);
-    const world = await getOrCreateDefaultWorld();
 
     if (!story) {
         notFound();
     }
 
     const isNewChapter = chapterId === 'new';
-    let chapter;
+    let chapter: EditorChapter | null;
 
     if (isNewChapter) {
         chapter = {
@@ -24,15 +25,16 @@ export default async function EditorPage({ params }: { params: Promise<{ id: str
             title: 'Untitled Chapter',
             wordCount: 0,
             status: 'Draft',
-            lastEdited: new Date(),
             order: story.chapters.length + 1,
-            content: ""
+            content: "",
+            storyId: story.id,
+            worldId: story.worldId
         };
     } else {
         chapter = await getChapterById(chapterId);
     }
 
-    if (!chapter) {
+    if (!chapter || chapter.storyId !== story.id) {
         notFound();
     }
 
@@ -41,10 +43,10 @@ export default async function EditorPage({ params }: { params: Promise<{ id: str
             story={{
                 id: story.id,
                 title: story.title,
-                worldId: world.id,
+                worldId: story.worldId,
                 chapters: story.chapters
             }}
-            chapter={chapter as any}
+            chapter={chapter}
         />
     );
 }

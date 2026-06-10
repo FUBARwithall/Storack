@@ -1,22 +1,91 @@
 "use server";
 
 import { prisma } from "@/lib/db";
+import { Prisma } from "@/lib/generated/prisma";
 import { revalidatePath } from "next/cache";
 import { CalendarConfig, CustomDate, DEFAULT_CALENDAR } from "./calendar-engine";
-import { getSession } from "./auth";
+import { requireUserId } from "./auth";
 import cloudinary from "@/lib/cloudinary";
+
+async function requireOwnedWorld(worldId: string) {
+    const userId = await requireUserId();
+    const world = await prisma.world.findFirst({
+        where: { id: worldId, userId },
+    });
+
+    if (!world) throw new Error("Not found");
+    return world;
+}
+
+async function requireOwnedStory(storyId: string) {
+    const userId = await requireUserId();
+    const story = await prisma.story.findFirst({
+        where: {
+            id: storyId,
+            world: { userId },
+        },
+    });
+
+    if (!story) throw new Error("Not found");
+    return story;
+}
+
+async function requireOwnedChapter(chapterId: string) {
+    const userId = await requireUserId();
+    const chapter = await prisma.chapter.findFirst({
+        where: {
+            id: chapterId,
+            world: { userId },
+        },
+    });
+
+    if (!chapter) throw new Error("Not found");
+    return chapter;
+}
+
+async function requireOwnedCalendar(calendarId: string) {
+    const userId = await requireUserId();
+    const calendar = await prisma.calendar.findFirst({
+        where: {
+            id: calendarId,
+            world: { userId },
+        },
+    });
+
+    if (!calendar) throw new Error("Not found");
+    return calendar;
+}
+
+async function requireOwnedCharacter(characterId: string) {
+    const userId = await requireUserId();
+    const character = await prisma.character.findFirst({
+        where: {
+            id: characterId,
+            world: { userId },
+        },
+    });
+
+    if (!character) throw new Error("Not found");
+    return character;
+}
+
+async function requireOwnedLocation(locationId: string) {
+    const userId = await requireUserId();
+    const location = await prisma.location.findFirst({
+        where: {
+            id: locationId,
+            world: { userId },
+        },
+    });
+
+    if (!location) throw new Error("Not found");
+    return location;
+}
 
 
 // --- World ---
-export async function getOrCreateDefaultWorld(userId?: string) {
-    let finalUserId = userId;
-
-    if (!finalUserId) {
-        const session = await getSession();
-        finalUserId = session?.user?.id as string | undefined;
-    }
-
-    if (!finalUserId) throw new Error("No user found");
+export async function getOrCreateDefaultWorld() {
+    const finalUserId = await requireUserId();
 
     const world = await prisma.world.findFirst({
         where: { userId: finalUserId },
@@ -35,6 +104,8 @@ export async function getOrCreateDefaultWorld(userId?: string) {
 
 // --- Calendars ---
 export async function getCalendars(worldId: string) {
+    await requireOwnedWorld(worldId);
+
     let calendars = await prisma.calendar.findMany({
         where: { worldId },
         orderBy: { createdAt: "asc" },
@@ -71,7 +142,7 @@ export async function getCalendars(worldId: string) {
             data: {
                 worldId,
                 name: DEFAULT_CALENDAR.name,
-                config: configData as any,
+                config: configData as unknown as Prisma.InputJsonValue,
                 currentDate: { year: 1, monthIndex: 0, day: 1 },
             },
         });
@@ -82,17 +153,19 @@ export async function getCalendars(worldId: string) {
         });
     }
 
-    return calendars.map((cal: { id: string; name: string; config: any; worldId: string; currentDate: any; createdAt: Date; updatedAt: Date }) => ({
+    return calendars.map((cal) => ({
         ...cal,
         // Ensure the JSON config matches our CalendarConfig interface
         // We merge the stored config with the id/name from the row
-        ...(cal.config as any),
+        ...(cal.config as unknown as Omit<CalendarConfig, "id" | "name">),
         id: cal.id,
         name: cal.name,
     })) as CalendarConfig[];
 }
 
 export async function createCalendar(worldId: string, config: CalendarConfig) {
+    await requireOwnedWorld(worldId);
+
     // Extract config fields to store in JSON
     const configData = {
         months: config.months,
@@ -111,7 +184,7 @@ export async function createCalendar(worldId: string, config: CalendarConfig) {
         data: {
             worldId,
             name: config.name,
-            config: configData as any,
+            config: configData as unknown as Prisma.InputJsonValue,
             currentDate: { year: 1, monthIndex: 0, day: 1 }, // Default start
         },
     });
@@ -120,26 +193,29 @@ export async function createCalendar(worldId: string, config: CalendarConfig) {
 
     return {
         ...newCal,
-        ...(newCal.config as any),
+        ...(newCal.config as unknown as Omit<CalendarConfig, "id" | "name">),
         id: newCal.id,
         name: newCal.name
     } as CalendarConfig;
 }
 
 export async function deleteCalendar(id: string) {
+    await requireOwnedCalendar(id);
     await prisma.calendar.delete({ where: { id } });
     revalidatePath("/world");
 }
 
 // --- Events ---
 export async function getEvents(calendarId: string) {
+    await requireOwnedCalendar(calendarId);
+
     const events = await prisma.timelineEvent.findMany({
         where: { calendarId },
         orderBy: { startDate: "asc" }, // Needs raw query or post-sort for JSON JSON? No, Prisma supports basic JSON filter but not deep sort easily. Let's fetch all and sort in client or here.
     });
 
     // Create a helper to sort if needed, but for now return raw
-    return events.map((e: { id: string; title: string; description: string | null; startDate: any; endDate: any; duration: number; chapterId: string | null; worldId: string; calendarId: string; createdAt: Date; updatedAt: Date }) => ({
+    return events.map((e) => ({
         id: e.id,
         title: e.title,
         description: e.description || '',
@@ -151,14 +227,26 @@ export async function getEvents(calendarId: string) {
 }
 
 export async function createEvent(calendarId: string, worldId: string, event: { title: string, description?: string, startDate: CustomDate, endDate: CustomDate, duration: number, chapterId?: string }) {
+    const [calendar, world] = await Promise.all([
+        requireOwnedCalendar(calendarId),
+        requireOwnedWorld(worldId),
+    ]);
+
+    if (calendar.worldId !== world.id) throw new Error("Not found");
+
+    if (event.chapterId && event.chapterId !== "none") {
+        const chapter = await requireOwnedChapter(event.chapterId);
+        if (chapter.worldId !== world.id) throw new Error("Not found");
+    }
+
     const newEvent = await prisma.timelineEvent.create({
         data: {
             calendarId,
             worldId,
             title: event.title,
             description: event.description,
-            startDate: event.startDate as any,
-            endDate: event.endDate as any,
+            startDate: event.startDate as unknown as Prisma.InputJsonValue,
+            endDate: event.endDate as unknown as Prisma.InputJsonValue,
             duration: event.duration,
             chapterId: event.chapterId === 'none' ? undefined : event.chapterId
         }
@@ -169,6 +257,8 @@ export async function createEvent(calendarId: string, worldId: string, event: { 
 
 // --- Stories ---
 export async function getStories(worldId: string) {
+    await requireOwnedWorld(worldId);
+
     const stories = await prisma.story.findMany({
         where: { worldId },
         include: {
@@ -186,8 +276,12 @@ export async function getStories(worldId: string) {
 }
 
 export async function getStoryById(id: string) {
-    const story = await prisma.story.findUnique({
-        where: { id },
+    const userId = await requireUserId();
+    const story = await prisma.story.findFirst({
+        where: {
+            id,
+            world: { userId },
+        },
         include: {
             chapters: {
                 orderBy: { order: 'asc' }
@@ -203,13 +297,19 @@ export async function getStoryById(id: string) {
 }
 
 export async function getChapterById(id: string) {
-    const chapter = await prisma.chapter.findUnique({
-        where: { id },
+    const userId = await requireUserId();
+    const chapter = await prisma.chapter.findFirst({
+        where: {
+            id,
+            world: { userId },
+        },
     });
     return chapter;
 }
 
 export async function createStory(worldId: string, data: { title: string, genre?: string, synopsis?: string, tags?: string[], coverImage?: string }) {
+    await requireOwnedWorld(worldId);
+
     const story = await prisma.story.create({
         data: {
             worldId,
@@ -229,6 +329,8 @@ export async function createStory(worldId: string, data: { title: string, genre?
 }
 
 export async function updateStory(id: string, data: Partial<{ title: string, genre: string, synopsis: string, status: string, tags: string[], coverImage: string }>) {
+    await requireOwnedStory(id);
+
     const story = await prisma.story.update({
         where: { id },
         data: {
@@ -243,12 +345,20 @@ export async function updateStory(id: string, data: Partial<{ title: string, gen
 }
 
 export async function deleteStory(id: string) {
+    await requireOwnedStory(id);
     await prisma.story.delete({ where: { id } });
     revalidatePath("/");
 }
 
 // --- Chapters ---
 export async function createChapter(storyId: string, worldId: string, data: { title: string, order: number }) {
+    const [story, world] = await Promise.all([
+        requireOwnedStory(storyId),
+        requireOwnedWorld(worldId),
+    ]);
+
+    if (story.worldId !== world.id) throw new Error("Not found");
+
     const chapter = await prisma.chapter.create({
         data: {
             storyId,
@@ -266,6 +376,8 @@ export async function createChapter(storyId: string, worldId: string, data: { ti
 }
 
 export async function updateChapter(id: string, data: Partial<{ title: string, content: string, status: string, wordCount: number }>) {
+    await requireOwnedChapter(id);
+
     const chapter = await prisma.chapter.update({
         where: { id },
         data: {
@@ -296,6 +408,13 @@ export async function updateChapter(id: string, data: Partial<{ title: string, c
 }
 
 export async function deleteChapter(id: string, storyId: string) {
+    const [chapter, story] = await Promise.all([
+        requireOwnedChapter(id),
+        requireOwnedStory(storyId),
+    ]);
+
+    if (chapter.storyId !== story.id) throw new Error("Not found");
+
     await prisma.chapter.delete({ where: { id } });
 
     const chapters = await prisma.chapter.findMany({
@@ -326,6 +445,8 @@ export async function createCharacter(worldId: string, data: {
     personality?: string,
     backstory?: string
 }) {
+    await requireOwnedWorld(worldId);
+
     const char = await prisma.character.create({
         data: {
             worldId,
@@ -348,6 +469,8 @@ export async function updateCharacter(id: string, data: Partial<{
     personality: string,
     backstory: string
 }>) {
+    await requireOwnedCharacter(id);
+
     const char = await prisma.character.update({
         where: { id },
         data
@@ -358,6 +481,7 @@ export async function updateCharacter(id: string, data: Partial<{
 }
 
 export async function deleteCharacter(id: string) {
+    await requireOwnedCharacter(id);
     await prisma.character.delete({ where: { id } });
     revalidatePath("/characters");
     revalidatePath("/world");
@@ -365,6 +489,8 @@ export async function deleteCharacter(id: string) {
 
 // --- Locations ---
 export async function createLocation(worldId: string, data: { name: string, type?: string, description?: string, mapUrl?: string, imageUrl?: string }) {
+    await requireOwnedWorld(worldId);
+
     const loc = await prisma.location.create({
         data: {
             worldId,
@@ -380,6 +506,8 @@ export async function createLocation(worldId: string, data: { name: string, type
 }
 
 export async function updateLocation(id: string, data: Partial<{ name: string, type: string, description: string, mapUrl: string, imageUrl: string }>) {
+    await requireOwnedLocation(id);
+
     const loc = await prisma.location.update({
         where: { id },
         data
@@ -389,11 +517,14 @@ export async function updateLocation(id: string, data: Partial<{ name: string, t
 }
 
 export async function deleteLocation(id: string) {
+    await requireOwnedLocation(id);
     await prisma.location.delete({ where: { id } });
     revalidatePath("/world");
 }
 
 export async function uploadStoryCover(id: string, formData: FormData) {
+    await requireOwnedStory(id);
+
     const file = formData.get("coverImage") as File;
     if (!file) return { error: "No file uploaded" };
 
@@ -419,6 +550,8 @@ export async function uploadStoryCover(id: string, formData: FormData) {
 }
 
 export async function uploadEditorImage(formData: FormData) {
+    await requireUserId();
+
     const file = formData.get("image") as File;
     if (!file) return { error: "No file uploaded" };
 
@@ -433,9 +566,11 @@ export async function uploadEditorImage(formData: FormData) {
 }
 
 export async function updateChapterDates(id: string, dates: CustomDate[]) {
+    await requireOwnedChapter(id);
+
     const chapter = await prisma.chapter.update({
         where: { id },
-        data: { date: dates as any }
+        data: { date: dates as unknown as Prisma.InputJsonValue }
     });
     revalidatePath("/");
     const storyId = chapter.storyId;

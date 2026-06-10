@@ -1,12 +1,20 @@
-import { jwtVerify, SignJWT } from "jose";
+import { jwtVerify, SignJWT, type JWTPayload } from "jose";
 import { cookies } from "next/headers";
-import { NextRequest, NextResponse } from "next/server";
+
+type SessionPayload = JWTPayload & {
+    user?: {
+        id: string;
+        username: string;
+        avatarUrl?: string | null;
+    };
+    expires?: Date | string;
+};
 
 if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET is not set in environment variables");
 const secretKey = process.env.JWT_SECRET;
 const key = new TextEncoder().encode(secretKey);
 
-export async function encrypt(payload: any) {
+export async function encrypt(payload: JWTPayload) {
     return await new SignJWT(payload)
         .setProtectedHeader({ alg: "HS256" })
         .setIssuedAt()
@@ -14,11 +22,11 @@ export async function encrypt(payload: any) {
         .sign(key);
 }
 
-export async function decrypt(input: string): Promise<any> {
+export async function decrypt(input: string): Promise<SessionPayload> {
     const { payload } = await jwtVerify(input, key, {
         algorithms: ["HS256"],
     });
-    return payload;
+    return payload as SessionPayload;
 }
 
 export async function login(user: { id: string; username: string; avatarUrl?: string | null }) {
@@ -37,9 +45,20 @@ export async function getSession() {
     if (!session) return null;
     try {
         return await decrypt(session);
-    } catch (e) {
+    } catch {
         return null;
     }
+}
+
+export async function requireUserId() {
+    const session = await getSession();
+    const userId = session?.user?.id as string | undefined;
+
+    if (!userId) {
+        throw new Error("Unauthorized");
+    }
+
+    return userId;
 }
 
 export async function updateSessionUser(updates: { username?: string; avatarUrl?: string | null }) {

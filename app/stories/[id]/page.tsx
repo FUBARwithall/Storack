@@ -2,7 +2,6 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import {
     ArrowLeft,
-    Settings,
     FileText,
     Plus,
     MoreVertical,
@@ -13,7 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getOrCreateDefaultWorld, getCalendars, getStoryById } from "@/lib/actions";
+import { getCalendars, getStoryById } from "@/lib/actions";
 import { CalendarWidget } from "@/components/world/CalendarWidget";
 import { formatRelativeTime } from "@/lib/types";
 import { prisma } from "@/lib/db";
@@ -24,24 +23,23 @@ import { StorySettings } from "./StorySettings";
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
 
-    // Fetch Data
     const story = await getStoryById(id);
-    const world = await getOrCreateDefaultWorld();
-    const calendars = await getCalendars(world.id);
-
-    const characters = await prisma.character.findMany({
-        where: { worldId: world.id },
-        orderBy: { name: 'asc' }
-    });
-
-    const locations = await prisma.location.findMany({
-        where: { worldId: world.id },
-        orderBy: { name: 'asc' }
-    });
 
     if (!story) {
         notFound();
     }
+
+    const calendars = await getCalendars(story.worldId);
+
+    const characters = await prisma.character.findMany({
+        where: { worldId: story.worldId },
+        orderBy: { name: 'asc' }
+    });
+
+    const locations = await prisma.location.findMany({
+        where: { worldId: story.worldId },
+        orderBy: { name: 'asc' }
+    });
 
     return (
         <div className="flex flex-col h-full bg-background">
@@ -79,7 +77,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                             {story.synopsis && (
                                 <div className="mt-3 max-w-2xl">
                                     <p className="text-sm text-muted-foreground/90 leading-relaxed line-clamp-2 hover:line-clamp-none transition-all cursor-pointer italic">
-                                        "{story.synopsis}"
+                                        &ldquo;{story.synopsis}&rdquo;
                                     </p>
                                 </div>
                             )}
@@ -243,21 +241,21 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                     <TabsContent value="characters" className="m-0">
                         <CharactersClient
                             initialCharacters={characters}
-                            worldId={world.id}
+                            worldId={story.worldId}
                         />
                     </TabsContent>
                     <TabsContent value="world" className="m-0">
                         <WorldClient
                             initialCharacters={characters}
                             initialLocations={locations}
-                            worldId={world.id}
+                            worldId={story.worldId}
                         />
                     </TabsContent>
                     <TabsContent value="timeline" className="m-0 p-8">
                         <div className="max-w-5xl mx-auto">
                             <CalendarWidget
                                 chapters={story.chapters}
-                                worldId={world.id}
+                                worldId={story.worldId}
                                 initialCalendars={calendars}
                             />
                         </div>
