@@ -21,6 +21,7 @@ export interface CalendarConfig {
     hoursInDay?: number; // Default 24
     minutesInHour?: number; // Default 60
     recurringEvents?: RecurringEvent[];
+    isGregorian?: boolean;
 }
 
 export interface RecurringEvent {
@@ -70,6 +71,7 @@ export const DEFAULT_CALENDAR: CalendarConfig = {
     hasLeapYear: true,
     leapYearInterval: 4,
     leapYearMonthIndex: 1, // February
+    isGregorian: true,
 };
 
 export class CalendarEngine {
@@ -81,8 +83,15 @@ export class CalendarEngine {
         this.totalDaysInYear = config.months.reduce((acc, month) => acc + month.days, 0);
     }
 
+    private isGregorianCalendar(): boolean {
+        return !!(this.config.isGregorian || this.config.id === 'default-gregorian' || this.config.name === 'Standard Earth Calendar');
+    }
+
     // Check if a specific year is a leap year
     isLeapYear(year: number): boolean {
+        if (this.isGregorianCalendar()) {
+            return new Date(year, 1, 29).getMonth() === 1;
+        }
         if (!this.config.hasLeapYear || !this.config.leapYearInterval) return false;
         // Simple leap year logic: divisible by interval. 
         // Complex logic (like "not 100 unless 400") is optional for custom calendars, sticking to simple for now.
@@ -91,6 +100,9 @@ export class CalendarEngine {
 
     // Get days in a specific month for a specific year
     getDaysInMonth(monthIndex: number, year: number): number {
+        if (this.isGregorianCalendar()) {
+            return new Date(year, monthIndex + 1, 0).getDate();
+        }
         const month = this.config.months[monthIndex];
         if (!month) return 0;
 
@@ -102,6 +114,9 @@ export class CalendarEngine {
     }
 
     getDaysInYear(year: number): number {
+        if (this.isGregorianCalendar()) {
+            return this.isLeapYear(year) ? 366 : 365;
+        }
         return this.isLeapYear(year) ? this.totalDaysInYear + 1 : this.totalDaysInYear;
     }
 
@@ -109,6 +124,13 @@ export class CalendarEngine {
     // Epoch is Year 1, Month 0, Day 1 = Day 1.
     // Negative years/days supported roughly, but let's assume Year 1 start for now.
     dateToAbsoluteDays(date: CustomDate): number {
+        if (this.isGregorianCalendar()) {
+            const d = new Date(0);
+            d.setUTCFullYear(date.year, date.monthIndex, date.day);
+            d.setUTCHours(0, 0, 0, 0);
+            return Math.floor(d.getTime() / 86400000);
+        }
+
         let totalDays = 0;
 
         // Add days for full past years
@@ -137,6 +159,15 @@ export class CalendarEngine {
 
     // Convert Absolute Days back to Date
     absoluteDaysToDate(totalDays: number): CustomDate {
+        if (this.isGregorianCalendar()) {
+            const d = new Date(totalDays * 86400000);
+            return {
+                year: d.getUTCFullYear(),
+                monthIndex: d.getUTCMonth(),
+                day: d.getUTCDate()
+            };
+        }
+
         let remainingDays = totalDays;
         let year = 1;
 
@@ -181,9 +212,27 @@ export class CalendarEngine {
     // Get Day of Week
     getDayOfWeek(date: CustomDate): string {
         if (this.config.weekDays.length === 0) return '';
+        if (this.isGregorianCalendar()) {
+            const d = new Date(0);
+            d.setUTCFullYear(date.year, date.monthIndex, date.day);
+            const dayIndex = (d.getUTCDay() + 6) % 7;
+            return this.config.weekDays[dayIndex].name;
+        }
         const absDays = this.dateToAbsoluteDays(date);
         const dayIndex = absDays % this.config.weekDays.length;
         return this.config.weekDays[dayIndex].name;
+    }
+
+    // Get starting empty cells count for calendar rendering
+    getStartOfMonthPadding(date: CustomDate): number {
+        if (this.isGregorianCalendar()) {
+            const d = new Date(0);
+            d.setUTCFullYear(date.year, date.monthIndex, 1);
+            return (d.getUTCDay() + 6) % 7;
+        }
+        const firstDayDate = { year: date.year, monthIndex: date.monthIndex, day: 1 };
+        const absDays = this.dateToAbsoluteDays(firstDayDate);
+        return absDays % this.config.weekDays.length;
     }
 
     // Compare two dates: -1 if a < b, 0 if equal, 1 if a > b

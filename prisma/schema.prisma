@@ -94,6 +94,7 @@ model Chapter {
   wordCount Int      @default(0)
   status    String   @default("Draft") // Draft, Editing, Completed
   lastEdited DateTime @default(now())
+  date      Json?
   
   worldId   String
   world     World    @relation(fields: [worldId], references: [id], onDelete: Cascade)

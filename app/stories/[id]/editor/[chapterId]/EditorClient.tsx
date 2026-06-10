@@ -6,6 +6,7 @@ import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import Placeholder from '@tiptap/extension-placeholder'
 import Image from '@tiptap/extension-image'
+import SearchAndReplace from "@sereneinserenade/tiptap-search-and-replace"
 
 const CustomImage = Image.extend({
     addAttributes() {
@@ -52,7 +53,11 @@ import {
     AlertCircle,
     AlignLeft,
     AlignCenter,
-    AlignRight
+    AlignRight,
+    Search,
+    ChevronUp,
+    ChevronDown,
+    X
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createChapter, updateChapter, deleteChapter, uploadEditorImage } from "@/lib/actions";
@@ -89,6 +94,12 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isImageActive, setIsImageActive] = useState(false);
     const [imageAttributes, setImageAttributes] = useState<{ size?: string; align?: string }>({});
+    
+    // Find & Replace States
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [replaceTerm, setReplaceTerm] = useState('');
+    const [caseSensitive, setCaseSensitive] = useState(false);
 
     const updateImageState = useCallback((editorInstance: any) => {
         if (!editorInstance) return;
@@ -113,9 +124,15 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
             Placeholder.configure({
                 placeholder: 'Once upon a time...',
             }),
+            SearchAndReplace.configure({
+                searchResultClass: 'search-result',
+            }),
         ],
         immediatelyRender: false,
         content: initialChapter.content || "",
+        parseOptions: {
+            preserveWhitespace: 'full',
+        },
         editorProps: {
             attributes: {
                 class: 'prose prose-lg dark:prose-invert focus:outline-none max-w-none flex-1 w-full min-h-[500px] font-serif text-justify',
@@ -155,6 +172,19 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
             updateImageState(editor);
         },
     });
+
+    const navigateSearchResult = useCallback((direction: 'next' | 'prev') => {
+        if (!editor) return;
+        if (direction === 'next') editor.commands.nextSearchResult();
+        else editor.commands.previousSearchResult();
+        // Dispatch empty transaction to force plugin to re-run & repaint decorations
+        editor.view.dispatch(editor.view.state.tr);
+        // Wait for DOM paint, then scroll the current match into view natively
+        requestAnimationFrame(() => {
+            const el = editor.view.dom.querySelector('.search-result-current');
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+    }, [editor]);
 
     const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -236,7 +266,7 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
 
         autosaveTimer.current = setTimeout(() => {
             handleSave();
-        }, 10000);
+        }, 300000);
 
         return () => {
             if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
@@ -270,6 +300,10 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
                 if (e.key.toLowerCase() === 's') {
                     e.preventDefault();
                     handleSave();
+                }
+                if (e.key.toLowerCase() === 'f') {
+                    e.preventDefault();
+                    setIsSearchOpen(prev => !prev);
                 }
             }
         };
@@ -318,6 +352,15 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
                     outline-offset: 2px;
                     border-radius: 0.375rem;
                 }
+                .search-result {
+                    background-color: rgba(250, 204, 21, 0.3); /* yellow-400 30% */
+                    border-radius: 0.125rem;
+                }
+                .search-result-current {
+                    background-color: rgba(234, 179, 8, 0.6); /* yellow-500 60% */
+                    outline: 1px solid var(--primary);
+                    border-radius: 0.125rem;
+                }
             `}} />
 
             {/* Editor Header */}
@@ -337,36 +380,33 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
                         <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium truncate">{story.title}</p>
                     </div>
 
+                </div>
+
+                <div className="flex items-center gap-2">
                     {hasChanges && saveStatus === 'idle' && (
                         <span className="hidden md:flex items-center gap-1.5 rounded-full bg-yellow-500/10 px-2.5 py-1 text-[10px] font-medium text-yellow-600 dark:text-yellow-400 border border-yellow-500/20">
                             <span className="h-1.5 w-1.5 rounded-full bg-yellow-500 animate-pulse" />
                             Unsaved changes
                         </span>
                     )}
-
                     {saveStatus === 'saving' && (
                         <span className="hidden md:flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-medium text-primary border border-primary/20">
                             <Loader2 className="h-3 w-3 animate-spin" />
                             Saving...
                         </span>
                     )}
-
                     {saveStatus === 'saved' && (
                         <span className="hidden md:flex items-center gap-1.5 rounded-full bg-green-500/10 px-2.5 py-1 text-[10px] font-medium text-green-600 dark:text-green-400 border border-green-500/20">
                             <Check className="h-3 w-3" />
                             Changes saved
                         </span>
                     )}
-
                     {saveStatus === 'error' && (
                         <span className="hidden md:flex items-center gap-1.5 rounded-full bg-destructive/10 px-2.5 py-1 text-[10px] font-medium text-destructive border border-destructive/20">
                             <AlertCircle className="h-3 w-3" />
                             Save failed
                         </span>
                     )}
-                </div>
-
-                <div className="flex items-center gap-2">
                     <span className="hidden sm:block text-[11px] font-medium text-muted-foreground border-r pr-4 mr-2">{wordCount.toLocaleString()} WORDS</span>
 
                     <DropdownMenu>
@@ -425,6 +465,132 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
                 </div>
             </header>
 
+            {/* Find & Replace Panel */}
+            {isSearchOpen && (
+                <div className="border-b bg-background p-3 flex flex-col gap-2 shadow-sm animate-in slide-in-from-top duration-200">
+                    <div className="max-w-3xl mx-auto w-full flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+                        <div className="flex flex-wrap items-center gap-2 flex-1 w-full">
+                            {/* Find Input */}
+                            <div className="relative flex items-center min-w-[200px] flex-1">
+                                <input
+                                    type="text"
+                                    value={searchTerm}
+                                    onChange={(e) => {
+                                        setSearchTerm(e.target.value);
+                                        editor.commands.setSearchTerm(e.target.value);
+                                    }}
+                                    placeholder="Find..."
+                                    className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring pr-20"
+                                    autoFocus
+                                />
+                                <div className="absolute right-2 flex items-center gap-1">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className={cn(
+                                            "h-5 w-5 rounded text-[10px]",
+                                            caseSensitive ? "bg-primary/20 text-primary" : "text-muted-foreground"
+                                        )}
+                                        onClick={() => {
+                                            const newVal = !caseSensitive;
+                                            setCaseSensitive(newVal);
+                                            editor.commands.setCaseSensitive(newVal);
+                                        }}
+                                        title="Match Case"
+                                    >
+                                        Aa
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {/* Replace Input */}
+                            <input
+                                type="text"
+                                value={replaceTerm}
+                                onChange={(e) => {
+                                    setReplaceTerm(e.target.value);
+                                    editor.commands.setReplaceTerm(e.target.value);
+                                }}
+                                placeholder="Replace with..."
+                                className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring min-w-[200px] flex-1"
+                            />
+
+                            {/* Navigation & Replace Buttons */}
+                            <div className="flex items-center gap-1.5">
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onMouseDown={(e) => { e.preventDefault(); navigateSearchResult('prev'); }}
+                                    disabled={!searchTerm}
+                                    title="Previous Match"
+                                >
+                                    <ChevronUp className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onMouseDown={(e) => { e.preventDefault(); navigateSearchResult('next'); }}
+                                    disabled={!searchTerm}
+                                    title="Next Match"
+                                >
+                                    <ChevronDown className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 px-2.5 text-xs font-semibold"
+                                    onMouseDown={(e) => { e.preventDefault(); editor.commands.replace(); }}
+                                    disabled={!searchTerm}
+                                >
+                                    Replace
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 px-2.5 text-xs font-semibold"
+                                    onMouseDown={(e) => { e.preventDefault(); editor.commands.replaceAll(); }}
+                                    disabled={!searchTerm}
+                                >
+                                    Replace All
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* Right side status & close */}
+                        <div className="flex items-center gap-2 self-end md:self-auto">
+                            {searchTerm && (
+                                <span className="text-[10px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                                    {(() => {
+                                        const storage = (editor.storage as any).searchAndReplace;
+                                        if (storage) {
+                                            const total = storage.results?.length || 0;
+                                            const current = total > 0 ? (storage.resultIndex ?? 0) + 1 : 0;
+                                            return `${current}/${total}`;
+                                        }
+                                        return '0/0';
+                                    })()}
+                                </span>
+                            )}
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                onClick={() => {
+                                    setIsSearchOpen(false);
+                                    setSearchTerm('');
+                                    setReplaceTerm('');
+                                    editor.commands.setSearchTerm('');
+                                }}
+                            >
+                                <X className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Editor Toolbar */}
             <div className="flex items-center justify-center gap-2 border-b bg-muted/30 p-2 z-10 sticky top-16">
                 <div className="flex items-center rounded-lg bg-background shadow-sm border p-0.5">
@@ -463,6 +629,12 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
                         icon={ImageIcon}
                         label="Insert Image"
                         onClick={() => fileInputRef.current?.click()}
+                    />
+                    <ToolbarButton
+                        icon={Search}
+                        label="Find & Replace (Ctrl+F)"
+                        active={isSearchOpen}
+                        onClick={() => setIsSearchOpen(prev => !prev)}
                     />
                     {isImageActive && (
                         <>
@@ -583,7 +755,7 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
                     <span>Draft Mode</span>
                     <span>Spellcheck: On</span>
                     {hasChanges && saveStatus === 'idle' && !isSaving && (
-                        <span className="text-yellow-500">Autosave in 10s...</span>
+                        <span className="text-yellow-500">Autosave in 5m...</span>
                     )}
                     {saveStatus === 'saving' && (
                         <span className="text-primary">Autosaving...</span>

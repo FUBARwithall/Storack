@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { CalendarConfig, CustomDate } from "./calendar-engine";
+import { CalendarConfig, CustomDate, DEFAULT_CALENDAR } from "./calendar-engine";
 import { getSession } from "./auth";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -38,10 +38,52 @@ export async function getOrCreateDefaultWorld(userId?: string) {
 
 // --- Calendars ---
 export async function getCalendars(worldId: string) {
-    const calendars = await prisma.calendar.findMany({
+    let calendars = await prisma.calendar.findMany({
         where: { worldId },
         orderBy: { createdAt: "asc" },
     });
+
+    const gregorianCalendars = calendars.filter(cal => cal.name === DEFAULT_CALENDAR.name);
+    if (gregorianCalendars.length > 1) {
+        const toDelete = gregorianCalendars.slice(1);
+        for (const cal of toDelete) {
+            await prisma.calendar.delete({ where: { id: cal.id } });
+        }
+        calendars = await prisma.calendar.findMany({
+            where: { worldId },
+            orderBy: { createdAt: "asc" },
+        });
+    }
+
+    const hasGregorian = calendars.some(cal => cal.name === DEFAULT_CALENDAR.name);
+    if (!hasGregorian) {
+        const configData = {
+            months: DEFAULT_CALENDAR.months,
+            weekDays: DEFAULT_CALENDAR.weekDays,
+            yearSuffix: DEFAULT_CALENDAR.yearSuffix,
+            hasLeapYear: DEFAULT_CALENDAR.hasLeapYear,
+            leapYearInterval: DEFAULT_CALENDAR.leapYearInterval,
+            leapYearMonthIndex: DEFAULT_CALENDAR.leapYearMonthIndex,
+            hoursInDay: DEFAULT_CALENDAR.hoursInDay || 24,
+            minutesInHour: DEFAULT_CALENDAR.minutesInHour || 60,
+            recurringEvents: DEFAULT_CALENDAR.recurringEvents || [],
+            isGregorian: DEFAULT_CALENDAR.isGregorian || false,
+        };
+
+        await prisma.calendar.create({
+            data: {
+                worldId,
+                name: DEFAULT_CALENDAR.name,
+                config: configData as any,
+                currentDate: { year: 1, monthIndex: 0, day: 1 },
+            },
+        });
+
+        calendars = await prisma.calendar.findMany({
+            where: { worldId },
+            orderBy: { createdAt: "asc" },
+        });
+    }
 
     return calendars.map((cal: { id: string; name: string; config: any; worldId: string; currentDate: any; createdAt: Date; updatedAt: Date }) => ({
         ...cal,
@@ -65,6 +107,7 @@ export async function createCalendar(worldId: string, config: CalendarConfig) {
         hoursInDay: config.hoursInDay || 24,
         minutesInHour: config.minutesInHour || 60,
         recurringEvents: config.recurringEvents || [],
+        isGregorian: config.isGregorian || false,
     };
 
     const newCal = await prisma.calendar.create({
@@ -402,5 +445,18 @@ export async function uploadEditorImage(formData: FormData) {
 
     const imageUrl = `/uploads/${filename}`;
     return { success: true, imageUrl };
+}
+
+export async function updateChapterDates(id: string, dates: CustomDate[]) {
+    const chapter = await prisma.chapter.update({
+        where: { id },
+        data: { date: dates as any }
+    });
+    revalidatePath("/");
+    const storyId = chapter.storyId;
+    if (storyId) {
+        revalidatePath(`/stories/${storyId}`);
+    }
+    return chapter;
 }
 

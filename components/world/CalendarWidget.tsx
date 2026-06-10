@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CalendarEngine, CustomDate, DEFAULT_CALENDAR, CalendarConfig, MonthConfig, WeekDayConfig, RecurringEvent } from "@/lib/calendar-engine";
 import { Calendar as CalendarIcon, Clock, ChevronLeft, ChevronRight, Plus, Trash, Settings, Save, X, Snowflake, Sun } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
-import { createCalendar, createEvent, getEvents } from "@/lib/actions";
+import { createCalendar, createEvent, getEvents, deleteCalendar, updateChapterDates } from "@/lib/actions";
 import { useEffect } from "react";
 
 const FANTASY_CALENDAR: CalendarConfig = {
@@ -67,8 +67,21 @@ const TEMPLATE_CALENDAR: CalendarConfig = {
     recurringEvents: []
 };
 
-export function CalendarWidget({ chapters = [], worldId, initialCalendars = [] }: { chapters?: { id: string; title: string; order: number }[], worldId: string, initialCalendars?: CalendarConfig[] }) {
+export function CalendarWidget({ chapters = [], worldId, initialCalendars = [] }: { chapters?: { id: string; title: string; order: number; date?: any }[], worldId: string, initialCalendars?: CalendarConfig[] }) {
     const [availableCalendars, setAvailableCalendars] = useState<CalendarConfig[]>(initialCalendars);
+    const [localChapters, setLocalChapters] = useState<{ id: string; title: string; order: number; date?: CustomDate[] }[]>(
+        chapters.map(ch => ({
+            ...ch,
+            date: Array.isArray(ch.date) ? ch.date : (ch.date ? [ch.date] : [])
+        }))
+    );
+
+    useEffect(() => {
+        setLocalChapters(chapters.map(ch => ({
+            ...ch,
+            date: Array.isArray(ch.date) ? ch.date : (ch.date ? [ch.date] : [])
+        })));
+    }, [chapters]);
 
     // Default to the first available calendar or null
     const [selectedCalendarId, setSelectedCalendarId] = useState<string | null>(
@@ -152,6 +165,51 @@ export function CalendarWidget({ chapters = [], worldId, initialCalendars = [] }
         }
     };
 
+    const handleDeleteCalendar = async () => {
+        if (!selectedCalendarId || !selectedCalendar) return;
+        if (confirm(`Are you sure you want to delete the calendar system "${selectedCalendar.name}"? This will also delete all timeline events linked to this calendar.`)) {
+            try {
+                await deleteCalendar(selectedCalendarId);
+                const remaining = availableCalendars.filter(c => c.id !== selectedCalendarId);
+                setAvailableCalendars(remaining);
+                if (remaining.length > 0) {
+                    setSelectedCalendarId(remaining[0].id);
+                } else {
+                    setSelectedCalendarId(null);
+                    setViewMode('create');
+                }
+            } catch (e) {
+                console.error("Failed to delete calendar", e);
+            }
+        }
+    };
+
+    const handleAddChapterDate = async (chapterId: string, date: CustomDate) => {
+        try {
+            const chapter = localChapters.find(ch => ch.id === chapterId);
+            if (!chapter) return;
+            const currentDates = Array.isArray(chapter.date) ? chapter.date : [];
+            const newDates = [...currentDates, date];
+            await updateChapterDates(chapterId, newDates);
+            setLocalChapters(prev => prev.map(ch => ch.id === chapterId ? { ...ch, date: newDates } : ch));
+        } catch (e) {
+            console.error("Failed to add chapter date", e);
+        }
+    };
+
+    const handleRemoveChapterDate = async (chapterId: string, dateIndex: number) => {
+        try {
+            const chapter = localChapters.find(ch => ch.id === chapterId);
+            if (!chapter) return;
+            const currentDates = Array.isArray(chapter.date) ? chapter.date : [];
+            const newDates = currentDates.filter((_, idx) => idx !== dateIndex);
+            await updateChapterDates(chapterId, newDates);
+            setLocalChapters(prev => prev.map(ch => ch.id === chapterId ? { ...ch, date: newDates } : ch));
+        } catch (e) {
+            console.error("Failed to remove chapter date", e);
+        }
+    };
+
     const handleLoadTemplate = (template: 'default' | 'fantasy') => {
         const config = template === 'default' ? DEFAULT_CALENDAR : FANTASY_CALENDAR;
         setNewCalendar({
@@ -228,24 +286,37 @@ export function CalendarWidget({ chapters = [], worldId, initialCalendars = [] }
                         Timeline Manager
                     </CardTitle>
                     {viewMode === 'timeline' && (
-                        <Select value={selectedCalendarId || "none"} onValueChange={handleCalendarChange}>
-                            <SelectTrigger className="w-[180px] h-8 text-xs">
-                                <SelectValue placeholder="Select System" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="new" className="text-indigo-600 font-medium focus:text-indigo-700">
-                                    <div className="flex items-center gap-2">
-                                        <Plus className="h-3 w-3 mr-1" /> Create New System
-                                    </div>
-                                </SelectItem>
-                                {availableCalendars.map(cal => (
-                                    <SelectItem key={cal.id} value={cal.id}>{cal.name}</SelectItem>
-                                ))}
-                                {availableCalendars.length === 0 && (
-                                    <SelectItem value="none" disabled>No systems found</SelectItem>
-                                )}
-                            </SelectContent>
-                        </Select>
+                        <div className="flex items-center gap-2">
+                            <Select value={selectedCalendarId || "none"} onValueChange={handleCalendarChange}>
+                                <SelectTrigger className="w-[180px] h-8 text-xs">
+                                    <SelectValue placeholder="Select System" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="new" className="text-indigo-600 font-medium focus:text-indigo-700">
+                                        <div className="flex items-center gap-2">
+                                            <Plus className="h-3 w-3 mr-1" /> Create New System
+                                        </div>
+                                    </SelectItem>
+                                    {availableCalendars.map(cal => (
+                                        <SelectItem key={cal.id} value={cal.id}>{cal.name}</SelectItem>
+                                    ))}
+                                    {availableCalendars.length === 0 && (
+                                        <SelectItem value="none" disabled>No systems found</SelectItem>
+                                    )}
+                                </SelectContent>
+                            </Select>
+                            {selectedCalendar && selectedCalendar.name !== 'Standard Earth Calendar' && (
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
+                                    onClick={handleDeleteCalendar}
+                                    title="Delete this calendar system"
+                                >
+                                    <Trash className="h-4 w-4" />
+                                </Button>
+                            )}
+                        </div>
                     )}
                 </div>
                 <CardDescription>
@@ -508,7 +579,7 @@ export function CalendarWidget({ chapters = [], worldId, initialCalendars = [] }
                                                 value={currentDate.monthIndex.toString()}
                                                 onValueChange={(v) => handleDateChange('monthIndex', parseInt(v))}
                                             >
-                                                <SelectTrigger className="border-none shadow-none focus:ring-0 font-semibold h-8 bg-transparent hover:bg-accent/50 p-0 text-base gap-1 min-w-[fit-content]">
+                                                <SelectTrigger className="!border-none !shadow-none focus:ring-0 font-semibold h-8 !bg-transparent hover:bg-accent/50 !px-2 text-base gap-1 min-w-[fit-content]">
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -523,7 +594,7 @@ export function CalendarWidget({ chapters = [], worldId, initialCalendars = [] }
                                             <div className="flex items-center gap-0.5">
                                                 <Input
                                                     type="number"
-                                                    className="w-[60px] text-center font-bold border-none shadow-none focus-visible:ring-0 p-0 h-8 text-base bg-transparent hover:bg-accent/50 rounded-md transition-colors"
+                                                    className="w-[60px] text-center font-bold !border-none !shadow-none focus-visible:ring-0 !p-0 h-8 text-base !bg-transparent hover:bg-accent/50 rounded-md transition-colors"
                                                     value={currentDate.year}
                                                     onChange={(e) => handleDateChange('year', parseInt(e.target.value) || 1)}
                                                 />
@@ -564,7 +635,7 @@ export function CalendarWidget({ chapters = [], worldId, initialCalendars = [] }
                                             style={{ gridTemplateColumns: `repeat(${selectedCalendar.weekDays.length}, minmax(0, 1fr))` }}
                                         >
                                             {/* Empty Padding for Start of Month */}
-                                            {Array.from({ length: engine.dateToAbsoluteDays({ year: currentDate.year, monthIndex: currentDate.monthIndex, day: 1 }) % selectedCalendar.weekDays.length }).map((_, i) => (
+                                            {Array.from({ length: engine.getStartOfMonthPadding(currentDate) }).map((_, i) => (
                                                 <div key={`empty-${i}`} className="h-8 w-8" />
                                             ))}
 
@@ -665,7 +736,7 @@ export function CalendarWidget({ chapters = [], worldId, initialCalendars = [] }
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     <SelectItem value="none">No Chapter</SelectItem>
-                                                    {chapters.map((ch) => (
+                                                    {localChapters.map((ch) => (
                                                         <SelectItem key={ch.id} value={ch.id}>
                                                             Ch {ch.order}: {ch.title}
                                                         </SelectItem>
@@ -685,23 +756,24 @@ export function CalendarWidget({ chapters = [], worldId, initialCalendars = [] }
                                     </div>
                                 </div>
 
-                                {/* Timeline Visualization */}
-                                {events.length > 0 && (
-                                    <div className="pt-2">
-                                        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
+                                {/* Timeline & Roadmap Grid */}
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 border-t border-dashed pt-6">
+                                    {/* Left: Chronicle (Events) */}
+                                    <div className="space-y-4">
+                                        <h3 className="text-sm font-semibold flex items-center gap-2">
                                             <div className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
                                             Chronicle
                                         </h3>
-                                        <div className="relative border-l-2 border-indigo-100 dark:border-indigo-900/50 ml-3 space-y-6 pb-2">
-                                            {events.map((event) => {
-                                                const linkedChapter = chapters.find(c => c.id === event.chapterId);
-                                                return (
-                                                    <div key={event.id} className="relative pl-6">
-                                                        {/* Timeline Dot */}
-                                                        <div className="absolute -left-[9px] top-1 h-4 w-4 rounded-full bg-indigo-500 border-4 border-background shadow-sm" />
+                                        {events.length > 0 ? (
+                                            <div className="relative border-l-2 border-indigo-100 dark:border-indigo-900/50 ml-3 space-y-6 pb-2">
+                                                {events.map((event) => {
+                                                    const linkedChapter = localChapters.find(c => c.id === event.chapterId);
+                                                    return (
+                                                        <div key={event.id} className="relative pl-6">
+                                                            {/* Timeline Dot */}
+                                                            <div className="absolute -left-[9px] top-1 h-4 w-4 rounded-full bg-indigo-500 border-4 border-background shadow-sm" />
 
-                                                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 group">
-                                                            <div className="flex-1 space-y-1">
+                                                            <div className="flex flex-col gap-1 group">
                                                                 <div className="flex items-center gap-2">
                                                                     <span className="text-xs font-mono text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/30 px-1.5 py-0.5 rounded">
                                                                         {engine.formatDate(event.startDate)}
@@ -723,21 +795,116 @@ export function CalendarWidget({ chapters = [], worldId, initialCalendars = [] }
                                                                 </div>
 
                                                                 {event.description && (
-                                                                    <p className="text-sm text-muted-foreground/90 leading-relaxed">
+                                                                    <p className="text-xs text-muted-foreground/90 leading-relaxed">
                                                                         {event.description}
                                                                     </p>
                                                                 )}
                                                             </div>
-                                                            <Badge variant="secondary" className="w-fit text-[10px] whitespace-nowrap opacity-50 group-hover:opacity-100 transition-opacity">
-                                                                {event.duration} {event.duration === 1 ? 'day' : 'days'}
-                                                            </Badge>
                                                         </div>
-                                                    </div>
-                                                )
-                                            })}
-                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <div className="text-center py-8 border border-dashed rounded-lg bg-muted/10 text-muted-foreground text-xs italic">
+                                                No events logged yet.
+                                            </div>
+                                        )}
                                     </div>
-                                )}
+
+                                    {/* Right: Story Roadmap (Chapters) */}
+                                    <div className="space-y-4">
+                                        <h3 className="text-sm font-semibold flex items-center gap-2">
+                                            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                            Story Roadmap
+                                        </h3>
+
+                                        {/* Assigned Roadmap Timeline */}
+                                        <div className="space-y-4">
+                                            {(() => {
+                                                const roadmapItems = localChapters.flatMap(ch => {
+                                                    const dates = Array.isArray(ch.date) ? ch.date : [];
+                                                    return dates.map((d, index) => ({
+                                                        ...ch,
+                                                        activeDate: d,
+                                                        dateIndex: index
+                                                    }));
+                                                }).sort((a, b) => engine.compareDates(a.activeDate, b.activeDate));
+
+                                                if (roadmapItems.length > 0) {
+                                                    return (
+                                                        <div className="relative border-l-2 border-emerald-100 dark:border-emerald-900/50 ml-3 space-y-6 pb-2">
+                                                            {roadmapItems.map((item) => (
+                                                                <div key={`${item.id}-${item.dateIndex}`} className="relative pl-6">
+                                                                    {/* Roadmap Dot */}
+                                                                    <div className="absolute -left-[9px] top-1 h-4 w-4 rounded-full bg-emerald-500 border-4 border-background shadow-sm" />
+
+                                                                    <div className="flex items-start justify-between gap-2">
+                                                                        <div className="space-y-1">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/30 px-1.5 py-0.5 rounded">
+                                                                                    {engine.formatDate(item.activeDate)}
+                                                                                </span>
+                                                                            </div>
+                                                                            <h4 className="font-semibold text-foreground text-sm">Ch {item.order}: {item.title}</h4>
+                                                                        </div>
+
+                                                                        <div className="flex items-center gap-1">
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="outline"
+                                                                                className="h-6 text-[9px] px-1.5 gap-0.5"
+                                                                                onClick={() => handleAddChapterDate(item.id, currentDate)}
+                                                                                title="Add current calendar date as another occurrence"
+                                                                            >
+                                                                                <Plus className="h-2 w-2" /> Add Date
+                                                                            </Button>
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="ghost"
+                                                                                className="h-6 text-[10px] text-muted-foreground hover:text-red-500 hover:bg-red-500/10 px-1.5"
+                                                                                onClick={() => handleRemoveChapterDate(item.id, item.dateIndex)}
+                                                                            >
+                                                                                Remove
+                                                                            </Button>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    );
+                                                } else {
+                                                    return (
+                                                        <div className="text-center py-8 border border-dashed rounded-lg bg-muted/10 text-muted-foreground text-xs italic">
+                                                            No chapters mapped to the timeline yet.
+                                                        </div>
+                                                    );
+                                                }
+                                            })()}
+                                        </div>
+
+                                        {/* Unassigned Chapters Dropdown/Queue */}
+                                        {localChapters.some(ch => !ch.date || ch.date.length === 0) && (
+                                            <div className="space-y-2 pt-2">
+                                                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Unassigned Chapters</h4>
+                                                <div className="flex flex-col gap-2 max-h-[200px] overflow-y-auto pr-1">
+                                                    {localChapters.filter(ch => !ch.date || ch.date.length === 0).map(ch => (
+                                                        <div key={ch.id} className="flex items-center justify-between p-2 rounded-lg border bg-card/30 text-xs">
+                                                            <span className="font-medium truncate">Ch {ch.order}: {ch.title}</span>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                className="h-6 text-[9px] gap-1 px-2"
+                                                                onClick={() => handleAddChapterDate(ch.id, currentDate)}
+                                                            >
+                                                                <Plus className="h-2.5 w-2.5" /> Set Date
+                                                            </Button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             </>
                         )}
                     </>
