@@ -109,7 +109,7 @@ export function CharactersClient({ initialCharacters, worldId }: CharactersClien
             {filteredCharacters.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in duration-500">
                     {filteredCharacters.map((char) => (
-                        <Card key={char.id} className="group overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border-muted/40 bg-card/60 backdrop-blur-sm">
+                        <Card key={char.id} className="group overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border-muted/40 bg-card/60 backdrop-blur-sm py-0 gap-0">
                             <div className="aspect-[4/5] w-full bg-muted flex items-center justify-center relative overflow-hidden">
                                 {char.avatarUrl ? (
                                     // eslint-disable-next-line @next/next/no-img-element
@@ -147,23 +147,25 @@ export function CharactersClient({ initialCharacters, worldId }: CharactersClien
                                 </div>
                             </div>
 
-                            <CardContent className="flex flex-col gap-2">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-[10px] font-bold uppercase tracking-widest text-primary/80">{char.role || "Character"}</span>
-                                    {char.age && <span className="text-[10px] text-muted-foreground font-medium">{char.age} years</span>}
+                            <CardContent className="p-4 flex flex-col gap-2">
+                                <div className="flex items-baseline justify-between gap-2">
+                                    <h3 className="text-base font-bold text-foreground leading-tight group-hover:text-primary transition-colors truncate">
+                                        {char.name}
+                                    </h3>
+                                    <span className="text-[10px] font-bold uppercase tracking-widest text-primary shrink-0 opacity-90">
+                                        {char.role || "Character"}
+                                    </span>
                                 </div>
 
-                                <div>
-                                    <h3 className="text-base font-bold text-foreground leading-tight group-hover:text-primary transition-colors">{char.name}</h3>
-                                    {(char.species || char.occupation) && (
-                                        <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">
-                                            {char.species}{char.species && char.occupation && " • "}{char.occupation}
-                                        </p>
-                                    )}
+                                <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                                    <span className="truncate">
+                                        {char.species}{char.species && char.occupation && " • "}{char.occupation}
+                                    </span>
+                                    {char.age && <span className="shrink-0">{char.age} yrs</span>}
                                 </div>
 
                                 {char.backstory && (
-                                    <p className="text-xs text-muted-foreground/70 line-clamp-2 mt-1 leading-relaxed border-t border-muted/20 pt-2">
+                                    <p className="text-xs text-muted-foreground/75 line-clamp-2 leading-relaxed border-t border-muted/20">
                                         {char.backstory}
                                     </p>
                                 )}

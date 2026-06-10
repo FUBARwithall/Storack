@@ -7,6 +7,32 @@ import Underline from '@tiptap/extension-underline'
 import Placeholder from '@tiptap/extension-placeholder'
 import Image from '@tiptap/extension-image'
 
+const CustomImage = Image.extend({
+    addAttributes() {
+        return {
+            ...this.parent?.(),
+            size: {
+                default: 'large',
+                parseHTML: (element) => element.getAttribute('data-size') || 'large',
+                renderHTML: (attributes) => {
+                    return {
+                        'data-size': attributes.size,
+                    };
+                },
+            },
+            align: {
+                default: 'center',
+                parseHTML: (element) => element.getAttribute('data-align') || 'center',
+                renderHTML: (attributes) => {
+                    return {
+                        'data-align': attributes.align,
+                    };
+                },
+            },
+        };
+    },
+});
+
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
@@ -19,14 +45,17 @@ import {
     Italic,
     Underline as UnderlineIcon,
     List,
-    AlignLeft,
+    Eraser,
     Image as ImageIcon,
     Loader2,
     Check,
-    AlertCircle
+    AlertCircle,
+    AlignLeft,
+    AlignCenter,
+    AlignRight
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { createChapter, updateChapter, deleteChapter } from "@/lib/actions";
+import { createChapter, updateChapter, deleteChapter, uploadEditorImage } from "@/lib/actions";
 import { cn } from "@/lib/utils";
 import {
     DropdownMenu,
@@ -57,12 +86,30 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
     const [wordCount, setWordCount] = useState(initialChapter.wordCount);
     const [hasChanges, setHasChanges] = useState(false);
     const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [isImageActive, setIsImageActive] = useState(false);
+    const [imageAttributes, setImageAttributes] = useState<{ size?: string; align?: string }>({});
+
+    const updateImageState = useCallback((editorInstance: any) => {
+        if (!editorInstance) return;
+        const active = editorInstance.isActive('image');
+        setIsImageActive(active);
+        if (active) {
+            const attrs = editorInstance.getAttributes('image');
+            setImageAttributes({
+                size: attrs.size || 'large',
+                align: attrs.align || 'center'
+            });
+        } else {
+            setImageAttributes({});
+        }
+    }, []);
 
     const editor = useEditor({
         extensions: [
             StarterKit,
             Underline,
-            Image,
+            CustomImage,
             Placeholder.configure({
                 placeholder: 'Once upon a time...',
             }),
@@ -93,8 +140,45 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
 
             const words = text.trim() ? text.trim().split(/\s+/).length : 0;
             setWordCount(words);
+            updateImageState(editor);
+        },
+        onSelectionUpdate: ({ editor }) => {
+            updateImageState(editor);
+        },
+        onFocus: ({ editor }) => {
+            updateImageState(editor);
+        },
+        onBlur: ({ editor }) => {
+            updateImageState(editor);
+        },
+        onCreate: ({ editor }) => {
+            updateImageState(editor);
         },
     });
+
+    const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !editor) return;
+
+        const formData = new FormData();
+        formData.append("image", file);
+
+        setSaveStatus('saving');
+        try {
+            const result = await uploadEditorImage(formData);
+            if (result && result.imageUrl) {
+                editor.chain().focus().setImage({ src: result.imageUrl }).run();
+                setIsImageActive(true);
+                setSaveStatus('saved');
+                setTimeout(() => setSaveStatus('idle'), 3000);
+            } else {
+                setSaveStatus('error');
+            }
+        } catch (error) {
+            console.error("Upload error:", error);
+            setSaveStatus('error');
+        }
+    }, [editor]);
 
     // Handle title changes for hasChanges
     useEffect(() => {
@@ -144,7 +228,7 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
         }
     }, [isSaving, initialChapter.id, story.id, story.worldId, story.chapters.length, title, wordCount, router, editor]);
 
-    // Autosave — debounce 2 detik setelah ada perubahan
+    // Autosave — debounce 10 detik setelah ada perubahan
     useEffect(() => {
         if (!hasChanges || isSaving || initialChapter.id === 'new') return;
 
@@ -152,7 +236,7 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
 
         autosaveTimer.current = setTimeout(() => {
             handleSave();
-        }, 2000);
+        }, 10000);
 
         return () => {
             if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
@@ -200,6 +284,13 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
 
     return (
         <div className="flex flex-col h-screen bg-background font-sans">
+            <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept="image/*"
+                onChange={handleImageUpload}
+            />
             <style dangerouslySetInnerHTML={{
                 __html: `
                 .ProseMirror p.is-editor-empty:first-child::before {
@@ -222,6 +313,11 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
                 .ProseMirror u { text-decoration: underline; }
                 .ProseMirror ul { list-style-type: disc; padding-left: 1.5em; }
                 .ProseMirror ol { list-style-type: decimal; padding-left: 1.5em; }
+                .ProseMirror-selectednode {
+                    outline: 2px solid var(--primary);
+                    outline-offset: 2px;
+                    border-radius: 0.375rem;
+                }
             `}} />
 
             {/* Editor Header */}
@@ -352,7 +448,7 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
                     />
                     <div className="mx-1.5 h-4 w-px bg-border/60" />
                     <ToolbarButton
-                        icon={AlignLeft}
+                        icon={Eraser}
                         label="Clear Text"
                         onClick={() => editor.chain().focus().clearContent().run()}
                     />
@@ -366,13 +462,107 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
                     <ToolbarButton
                         icon={ImageIcon}
                         label="Insert Image"
-                        onClick={() => {
-                            const url = window.prompt('URL');
-                            if (url) {
-                                editor.chain().focus().setImage({ src: url }).run();
-                            }
-                        }}
+                        onClick={() => fileInputRef.current?.click()}
                     />
+                    {isImageActive && (
+                        <>
+                            <div className="mx-1.5 h-4 w-px bg-border/60" />
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    editor.chain().focus().updateAttributes('image', { size: 'small' }).run();
+                                    setImageAttributes(prev => ({ ...prev, size: 'small' }));
+                                }}
+                                className={cn(
+                                    "h-8 px-2.5 text-xs font-semibold rounded-md transition-colors",
+                                    imageAttributes.size === 'small' ? "bg-muted text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                                )}
+                            >
+                                Small
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    editor.chain().focus().updateAttributes('image', { size: 'medium' }).run();
+                                    setImageAttributes(prev => ({ ...prev, size: 'medium' }));
+                                }}
+                                className={cn(
+                                    "h-8 px-2.5 text-xs font-semibold rounded-md transition-colors",
+                                    imageAttributes.size === 'medium' ? "bg-muted text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                                )}
+                            >
+                                Medium
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    editor.chain().focus().updateAttributes('image', { size: 'large' }).run();
+                                    setImageAttributes(prev => ({ ...prev, size: 'large' }));
+                                }}
+                                className={cn(
+                                    "h-8 px-2.5 text-xs font-semibold rounded-md transition-colors",
+                                    imageAttributes.size === 'large' || !imageAttributes.size ? "bg-muted text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                                )}
+                            >
+                                Large
+                            </Button>
+                            <div className="mx-1 h-4 w-px bg-border/60" />
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Align Left"
+                                onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    editor.chain().focus().updateAttributes('image', { align: 'left' }).run();
+                                    setImageAttributes(prev => ({ ...prev, align: 'left' }));
+                                }}
+                                className={cn(
+                                    "h-8 w-8 rounded-md transition-colors",
+                                    imageAttributes.align === 'left' ? "bg-muted text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                                )}
+                            >
+                                <AlignLeft className="h-4 w-4" />
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Align Center"
+                                onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    editor.chain().focus().updateAttributes('image', { align: 'center' }).run();
+                                    setImageAttributes(prev => ({ ...prev, align: 'center' }));
+                                }}
+                                className={cn(
+                                    "h-8 w-8 rounded-md transition-colors",
+                                    imageAttributes.align === 'center' || !imageAttributes.align ? "bg-muted text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                                )}
+                            >
+                                <AlignCenter className="h-4 w-4" />
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Align Right"
+                                onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    editor.chain().focus().updateAttributes('image', { align: 'right' }).run();
+                                    setImageAttributes(prev => ({ ...prev, align: 'right' }));
+                                }}
+                                className={cn(
+                                    "h-8 w-8 rounded-md transition-colors",
+                                    imageAttributes.align === 'right' ? "bg-muted text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                                )}
+                            >
+                                <AlignRight className="h-4 w-4" />
+                            </Button>
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -380,7 +570,7 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
                 className="flex-1 overflow-y-auto bg-background selection:bg-primary/20 flex flex-col"
                 onClick={() => editor.commands.focus()}
             >
-                <div className="w-full py-16 flex-1 flex flex-col bg-white">
+                <div className="w-full py-16 flex-1 flex flex-col bg-background">
                     <div className="max-w-3xl mx-auto w-full">
                         <EditorContent editor={editor} className="flex-1" />
                     </div>
@@ -393,7 +583,7 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
                     <span>Draft Mode</span>
                     <span>Spellcheck: On</span>
                     {hasChanges && saveStatus === 'idle' && !isSaving && (
-                        <span className="text-yellow-500">Autosave in 2s...</span>
+                        <span className="text-yellow-500">Autosave in 10s...</span>
                     )}
                     {saveStatus === 'saving' && (
                         <span className="text-primary">Autosaving...</span>

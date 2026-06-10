@@ -128,31 +128,31 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                     <TabsList className="bg-transparent h-auto p-0 gap-2 rounded-none border-b-0">
                         <TabsTrigger
                             value="overview"
-                            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none py-4 px-4 font-medium transition-all"
+                            className="rounded-none border-0 data-[state=active]:bg-transparent dark:data-[state=active]:bg-transparent data-[state=active]:shadow-none py-4 px-4 font-medium transition-all"
                         >
                             Overview
                         </TabsTrigger>
                         <TabsTrigger
                             value="characters"
-                            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none py-4 px-4 font-medium transition-all"
+                            className="rounded-none border-0 data-[state=active]:bg-transparent dark:data-[state=active]:bg-transparent data-[state=active]:shadow-none py-4 px-4 font-medium transition-all"
                         >
                             Characters
                         </TabsTrigger>
                         <TabsTrigger
                             value="world"
-                            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none py-4 px-4 font-medium transition-all"
+                            className="rounded-none border-0 data-[state=active]:bg-transparent dark:data-[state=active]:bg-transparent data-[state=active]:shadow-none py-4 px-4 font-medium transition-all"
                         >
                             World
                         </TabsTrigger>
                         <TabsTrigger
                             value="notes"
-                            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none py-4 px-4 font-medium transition-all"
+                            className="rounded-none border-0 data-[state=active]:bg-transparent dark:data-[state=active]:bg-transparent data-[state=active]:shadow-none py-4 px-4 font-medium transition-all"
                         >
                             Notes
                         </TabsTrigger>
                         <TabsTrigger
                             value="timeline"
-                            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none py-4 px-4 font-medium transition-all"
+                            className="rounded-none border-0 data-[state=active]:bg-transparent dark:data-[state=active]:bg-transparent data-[state=active]:shadow-none py-4 px-4 font-medium transition-all"
                         >
                             Timeline
                         </TabsTrigger>
@@ -161,7 +161,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
 
                 <div className="flex-1 bg-muted/30">
                     <TabsContent value="overview" className="m-0 p-8">
-                        <div className="max-w-4xl space-y-8">
+                        <div className="w-full space-y-8">
                             {/* Chapters Section */}
                             <section>
                                 <div className="flex items-center justify-between mb-4">

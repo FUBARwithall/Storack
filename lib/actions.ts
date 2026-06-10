@@ -139,7 +139,10 @@ export async function getStories(worldId: string) {
         orderBy: { updatedAt: 'desc' }
     });
 
-    return stories;
+    return stories.map(story => ({
+        ...story,
+        wordCount: story.chapters.reduce((sum, ch) => sum + ch.wordCount, 0)
+    }));
 }
 
 export async function getStoryById(id: string) {
@@ -152,7 +155,11 @@ export async function getStoryById(id: string) {
         }
     });
 
-    return story;
+    if (!story) return null;
+    return {
+        ...story,
+        wordCount: story.chapters.reduce((sum, ch) => sum + ch.wordCount, 0)
+    };
 }
 
 export async function getChapterById(id: string) {
@@ -227,12 +234,43 @@ export async function updateChapter(id: string, data: Partial<{ title: string, c
         }
     });
 
+    const storyId = chapter.storyId;
+    if (storyId) {
+        const chapters = await prisma.chapter.findMany({
+            where: { storyId }
+        });
+        const totalWordCount = chapters.reduce((sum, ch) => sum + ch.wordCount, 0);
+
+        await prisma.story.update({
+            where: { id: storyId },
+            data: {
+                wordCount: totalWordCount,
+                lastEdited: new Date()
+            }
+        });
+    }
+
     revalidatePath("/");
+    revalidatePath(`/stories/${storyId}`);
     return chapter;
 }
 
 export async function deleteChapter(id: string, storyId: string) {
     await prisma.chapter.delete({ where: { id } });
+
+    const chapters = await prisma.chapter.findMany({
+        where: { storyId }
+    });
+    const totalWordCount = chapters.reduce((sum, ch) => sum + ch.wordCount, 0);
+
+    await prisma.story.update({
+        where: { id: storyId },
+        data: {
+            wordCount: totalWordCount,
+            lastEdited: new Date()
+        }
+    });
+
     revalidatePath(`/stories/${storyId}`);
     revalidatePath("/");
 }
@@ -342,6 +380,27 @@ export async function uploadStoryCover(id: string, formData: FormData) {
     revalidatePath("/");
     revalidatePath(`/stories/${id}`);
 
+    return { success: true, imageUrl };
+}
+
+export async function uploadEditorImage(formData: FormData) {
+    const file = formData.get("image") as File;
+    if (!file) return { error: "No file uploaded" };
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const ext = path.extname(file.name);
+    const filename = `editor-${Date.now()}${ext}`;
+
+    // Ensure uploads directory exists
+    const uploadDir = path.join(process.cwd(), "public", "uploads");
+    if (!existsSync(uploadDir)) {
+        mkdirSync(uploadDir, { recursive: true });
+    }
+
+    const filePath = path.join(uploadDir, filename);
+    await writeFile(filePath, buffer);
+
+    const imageUrl = `/uploads/${filename}`;
     return { success: true, imageUrl };
 }
 

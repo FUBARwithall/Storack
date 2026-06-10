@@ -7,10 +7,13 @@ import {
   CardContent,
 } from "@/components/ui/card"
 import { getOrCreateDefaultWorld, getStories } from "@/lib/actions";
+import { getSession } from "@/lib/auth";
 
 export default async function Home() {
   const world = await getOrCreateDefaultWorld();
   const stories = await getStories(world.id);
+  const session = await getSession();
+  const username = session?.user?.username || "Writer";
 
   const totalWords = stories.reduce((acc, story) => acc + story.wordCount, 0);
   const activeProjects = stories.filter(s => s.status !== 'Completed').length;
@@ -20,7 +23,7 @@ export default async function Home() {
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Welcome back, get ready to write.</p>
+          <p className="text-muted-foreground mt-1">Good morning {username}, get ready to write.</p>
         </div>
         <Link href="/stories/new">
           <Button size="lg" className="shadow-lg shadow-indigo-500/20">
@@ -28,44 +31,6 @@ export default async function Home() {
           </Button>
         </Link>
       </header>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardContent className="flex items-center gap-4 p-6">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400">
-              <BookOpen className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Total Words Written</p>
-              <p className="text-2xl font-bold text-foreground">{totalWords.toLocaleString()}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="flex items-center gap-4 p-6">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400">
-              <Target className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Active Projects</p>
-              <p className="text-2xl font-bold text-foreground">{activeProjects}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="flex items-center gap-4 p-6">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400">
-              <Clock className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Total Stories</p>
-              <p className="text-2xl font-bold text-foreground">{stories.length}</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
       <section className="space-y-4">
         <div className="flex items-center justify-between">

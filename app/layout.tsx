@@ -20,6 +20,7 @@ export const metadata: Metadata = {
 
 import { ThemeProvider } from "@/components/theme-provider"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { Toaster } from "@/components/ui/sonner"
 import { getSession } from "@/lib/auth";
 
 export default async function RootLayout({
@@ -44,6 +45,7 @@ export default async function RootLayout({
             <LayoutWrapper user={session?.user}>
               {children}
             </LayoutWrapper>
+            <Toaster position="bottom-right" />
           </TooltipProvider>
         </ThemeProvider>
       </body>

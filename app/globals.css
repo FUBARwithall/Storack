@@ -126,3 +126,48 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Image Sizing Custom Styles */
+img[data-size] {
+  display: block !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+img[data-size="small"] {
+  max-width: 25% !important;
+  height: auto !important;
+}
+img[data-size="medium"] {
+  max-width: 50% !important;
+  height: auto !important;
+}
+img[data-size="large"] {
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+/* Image Alignment Custom Styles */
+img[data-size][data-align="left"] {
+  float: left !important;
+  display: inline-block !important;
+  margin-left: 0 !important;
+  margin-right: 1.5rem !important;
+  margin-top: 0.5rem !important;
+  margin-bottom: 0.5rem !important;
+}
+img[data-size][data-align="center"] {
+  float: none !important;
+  display: block !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  margin-top: 1.5rem !important;
+  margin-bottom: 1.5rem !important;
+}
+img[data-size][data-align="right"] {
+  float: right !important;
+  display: inline-block !important;
+  margin-left: 1.5rem !important;
+  margin-right: 0 !important;
+  margin-top: 0.5rem !important;
+  margin-bottom: 0.5rem !important;
+}
