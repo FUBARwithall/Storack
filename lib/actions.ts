@@ -4,10 +4,7 @@ import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { CalendarConfig, CustomDate, DEFAULT_CALENDAR } from "./calendar-engine";
 import { getSession } from "./auth";
-import fs from "node:fs/promises";
-import path from "node:path";
-import { writeFile } from "node:fs/promises";
-import { existsSync, mkdirSync } from "node:fs";
+import cloudinary from "@/lib/cloudinary";
 
 
 // --- World ---
@@ -401,19 +398,14 @@ export async function uploadStoryCover(id: string, formData: FormData) {
     if (!file) return { error: "No file uploaded" };
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const ext = path.extname(file.name);
-    const filename = `${id}-${Date.now()}${ext}`;
+    const base64 = `data:${file.type};base64,${buffer.toString("base64")}`;
 
-    // Ensure uploads directory exists
-    const uploadDir = path.join(process.cwd(), "public", "uploads");
-    if (!existsSync(uploadDir)) {
-        mkdirSync(uploadDir, { recursive: true });
-    }
+    const result = await cloudinary.uploader.upload(base64, {
+        folder: "storack/covers",
+        public_id: `${id}-${Date.now()}`,
+    });
 
-    const filePath = path.join(uploadDir, filename);
-    await writeFile(filePath, buffer);
-
-    const imageUrl = `/uploads/${filename}`;
+    const imageUrl = result.secure_url;
 
     await prisma.story.update({
         where: { id },
@@ -431,20 +423,13 @@ export async function uploadEditorImage(formData: FormData) {
     if (!file) return { error: "No file uploaded" };
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const ext = path.extname(file.name);
-    const filename = `editor-${Date.now()}${ext}`;
+    const base64 = `data:${file.type};base64,${buffer.toString("base64")}`;
 
-    // Ensure uploads directory exists
-    const uploadDir = path.join(process.cwd(), "public", "uploads");
-    if (!existsSync(uploadDir)) {
-        mkdirSync(uploadDir, { recursive: true });
-    }
+    const result = await cloudinary.uploader.upload(base64, {
+        folder: "storack/editor",
+    });
 
-    const filePath = path.join(uploadDir, filename);
-    await writeFile(filePath, buffer);
-
-    const imageUrl = `/uploads/${filename}`;
-    return { success: true, imageUrl };
+    return { success: true, imageUrl: result.secure_url };
 }
 
 export async function updateChapterDates(id: string, dates: CustomDate[]) {

@@ -67,7 +67,7 @@ export async function loginAction(formData: FormData) {
         return { error: "Invalid username or password" };
     }
 
-    await login({ id: user.id, username: user.username });
+    await login({ id: user.id, username: user.username, avatarUrl: user.avatarUrl });
     revalidatePath("/");
     redirect("/");
 }

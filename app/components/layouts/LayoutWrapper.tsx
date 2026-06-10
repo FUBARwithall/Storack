@@ -8,7 +8,7 @@ export default function LayoutWrapper({
     user
 }: {
     children: React.ReactNode;
-    user?: { id: string; username: string } | null;
+    user?: { id: string; username: string; avatarUrl?: string | null } | null;
 }) {
     const pathname = usePathname();
     const isAuthPage = pathname === "/auth";

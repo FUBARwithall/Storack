@@ -2,6 +2,8 @@ import { Button } from "@/components/ui/button";
 import { User, Bell, Shield, Palette, Cloud, LogOut, Laptop, Moon, Sun } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { logoutAction } from "@/lib/auth-actions";
+import { ThemeSelector } from "./ThemeSelector";
+import { ProfileForm } from "./ProfileForm";
 
 
 
@@ -22,26 +24,11 @@ export default async function SettingsPage() {
                     <h2 className="mb-4 text-lg font-semibold text-foreground flex items-center gap-2">
                         <User className="h-5 w-5" /> Profile
                     </h2>
-                    <div className="flex items-center gap-6">
-                        <div className="h-20 w-20 rounded-full bg-secondary flex items-center justify-center text-primary text-2xl font-bold overflow-hidden">
-                            {user?.username ? (
-                                <img
-                                    src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`}
-                                    alt={user.username}
-                                    className="h-full w-full object-cover"
-                                />
-                            ) : (
-                                "G"
-                            )}
-                        </div>
-                        <div className="space-y-1">
-                            <h3 className="font-medium text-foreground">{user?.username || "Guest User"}</h3>
-                            <p className="text-sm text-muted-foreground">{user ? `${user.username}@storack.app` : "Not signed in"}</p>
-                            <div className="pt-2">
-                                <Button variant="outline" size="sm">Edit Profile</Button>
-                            </div>
-                        </div>
-                    </div>
+                    {user ? (
+                        <ProfileForm user={user} />
+                    ) : (
+                        <p className="text-muted-foreground text-sm">Not signed in.</p>
+                    )}
                 </section>
 
 
@@ -50,20 +37,7 @@ export default async function SettingsPage() {
                     <h2 className="mb-4 text-lg font-semibold text-foreground flex items-center gap-2">
                         <Palette className="h-5 w-5" /> Appearance
                     </h2>
-                    <div className="grid grid-cols-3 gap-4">
-                        <button className="flex flex-col items-center gap-2 rounded-lg border-2 border-border p-4 hover:bg-muted">
-                            <Sun className="h-6 w-6 text-foreground" />
-                            <span className="text-sm font-medium">Light</span>
-                        </button>
-                        <button className="flex flex-col items-center gap-2 rounded-lg border-2 border-primary bg-primary/10 p-4">
-                            <Laptop className="h-6 w-6 text-primary" />
-                            <span className="text-sm font-medium text-primary">System</span>
-                        </button>
-                        <button className="flex flex-col items-center gap-2 rounded-lg border-2 border-border p-4 hover:bg-muted">
-                            <Moon className="h-6 w-6 text-foreground" />
-                            <span className="text-sm font-medium">Dark</span>
-                        </button>
-                    </div>
+                    <ThemeSelector />
                 </section>
 
                 {/* Notifications */}

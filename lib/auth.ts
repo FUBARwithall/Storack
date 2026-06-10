@@ -21,7 +21,7 @@ export async function decrypt(input: string): Promise<any> {
     return payload;
 }
 
-export async function login(user: { id: string; username: string }) {
+export async function login(user: { id: string; username: string; avatarUrl?: string | null }) {
     const expires = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours
     const session = await encrypt({ user, expires });
 
@@ -40,4 +40,20 @@ export async function getSession() {
     } catch (e) {
         return null;
     }
+}
+
+export async function updateSessionUser(updates: { username?: string; avatarUrl?: string | null }) {
+    const session = await getSession();
+    if (!session || !session.user) return;
+
+    session.user = {
+        ...session.user,
+        ...updates
+    };
+
+    const expires = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours
+    session.expires = expires;
+    const newSessionToken = await encrypt(session);
+    
+    (await cookies()).set("session", newSessionToken, { expires, httpOnly: true });
 }

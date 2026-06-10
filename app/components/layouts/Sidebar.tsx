@@ -42,7 +42,6 @@ const sidebarItems = [
     { name: 'My Stories', href: '/stories', icon: BookOpen },
     { name: 'Characters', href: '/characters', icon: Users },
     { name: 'Worldbuilding', href: '/world', icon: Database },
-    { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
 export function Sidebar({
@@ -50,7 +49,7 @@ export function Sidebar({
     user
 }: {
     className?: string;
-    user?: { id: string; username: string } | null;
+    user?: { id: string; username: string; avatarUrl?: string | null } | null;
 }) {
 
     const { setTheme } = useTheme();
@@ -83,7 +82,7 @@ export function Sidebar({
                     <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="w-full justify-start gap-3 h-12 px-2 hover:bg-accent/50">
                             <Avatar className="h-8 w-8 rounded-lg border">
-                                <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username || 'user'}`} alt={user?.username || "User"} />
+                                <AvatarImage src={user?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username || 'user'}`} alt={user?.username || "User"} />
                                 <AvatarFallback className="rounded-lg bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
                                     {user?.username ? user.username.substring(0, 2).toUpperCase() : 'US'}
                                 </AvatarFallback>
@@ -102,13 +101,11 @@ export function Sidebar({
                         <DropdownMenuLabel>My Account</DropdownMenuLabel>
                         <DropdownMenuSeparator />
                         <DropdownMenuGroup>
-                            <DropdownMenuItem>
-                                <UserIcon className="mr-2 h-4 w-4" />
-                                <span>Profile</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                                <Settings className="mr-2 h-4 w-4" />
-                                <span>Settings</span>
+                            <DropdownMenuItem asChild>
+                                <Link href="/settings" className="w-full flex items-center cursor-pointer">
+                                    <UserIcon className="mr-2 h-4 w-4" />
+                                    Profile
+                                </Link>
                             </DropdownMenuItem>
                             <DropdownMenuSub>
                                 <DropdownMenuSubTrigger>
@@ -132,7 +129,13 @@ export function Sidebar({
                             </DropdownMenuSub>
                         </DropdownMenuGroup>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-destructive focus:text-destructive">
+                        <DropdownMenuItem 
+                            className="text-destructive focus:text-destructive cursor-pointer"
+                            onClick={async () => {
+                                const { logoutAction } = await import("@/lib/auth-actions");
+                                await logoutAction();
+                            }}
+                        >
                             <LogOut className="mr-2 h-4 w-4" />
                             <span>Log out</span>
                         </DropdownMenuItem>
