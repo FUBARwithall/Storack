@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import {
     LayoutDashboard,
+    BarChart3,
     BookOpen,
-    Settings,
     PenTool,
     Database,
     Users,
@@ -119,6 +119,12 @@ export function Sidebar({
                                 <Link href="/settings" className="w-full flex items-center cursor-pointer">
                                     <UserIcon className="mr-2 h-4 w-4" />
                                     Profile
+                                </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                                <Link href="/analysis" className="w-full flex items-center cursor-pointer">
+                                    <BarChart3 className="mr-2 h-4 w-4" />
+                                    Analysis
                                 </Link>
                             </DropdownMenuItem>
                             <DropdownMenuSub>
