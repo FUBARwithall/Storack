@@ -29,7 +29,7 @@ export function StoryCard({ story, className }: StoryCardProps) {
     return (
         <Link href={`/stories/${story.id}`} className="h-full block">
             <Card className={cn("group overflow-hidden hover:shadow-lg hover:shadow-primary/10 hover:border-primary/30 transition-all duration-300 hover:-translate-y-1 border-border bg-card flex flex-col h-full py-0 gap-0", className)}>
-                <div className="relative h-28 w-full bg-gradient-to-br from-primary/30 to-purple-600/10 overflow-hidden border-b border-border">
+                <div className="relative h-36 w-full bg-gradient-to-br from-primary/30 to-purple-600/10 overflow-hidden border-b border-border">
                     {story.coverImage ? (
                         <img src={story.coverImage} alt={story.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
                     ) : (
