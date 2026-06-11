@@ -1,15 +1,27 @@
 import { Button } from "@/components/ui/button";
-import { User, Bell, Shield, Palette, Cloud, LogOut, Laptop, Moon, Sun } from "lucide-react";
+import { User, Bell, Shield, Palette, Cloud, LogOut, Laptop, Moon, Sun, HardDrive } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { logoutAction } from "@/lib/auth-actions";
 import { ThemeSelector } from "./ThemeSelector";
 import { ProfileForm } from "./ProfileForm";
-
-
+import { prisma } from "@/lib/db";
+import { BillingSection } from "./BillingSection";
 
 export default async function SettingsPage() {
     const session = await getSession();
     const user = session?.user;
+
+    let userDb = null;
+    if (user?.id) {
+        userDb = await prisma.user.findUnique({
+            where: { id: user.id },
+            include: {
+                uploadedFiles: {
+                    orderBy: { createdAt: "desc" }
+                }
+            }
+        });
+    }
 
     return (
         <div className="p-8 space-y-8 max-w-4xl mx-auto">
@@ -31,6 +43,28 @@ export default async function SettingsPage() {
                     )}
                 </section>
 
+                {/* Plan & Storage Section */}
+                <section className="rounded-xl border bg-card text-card-foreground p-6">
+                    <h2 className="mb-4 text-lg font-semibold text-foreground flex items-center gap-2">
+                        <HardDrive className="h-5 w-5" /> Plan & Storage
+                    </h2>
+                    {user && userDb ? (
+                        <BillingSection 
+                            userId={user.id}
+                            plan={userDb.plan}
+                            storageUsedBytes={userDb.storageUsedBytes}
+                            uploadedFiles={userDb.uploadedFiles.map(f => ({
+                                id: f.id,
+                                url: f.url,
+                                size: f.size,
+                                createdAt: f.createdAt.toISOString()
+                            }))}
+                            checkoutUrl={`https://storack.lemonsqueezy.com/buy/${process.env.LEMON_SQUEEZY_VARIANT_ID}?checkout[custom][userId]=${user.id}`}
+                        />
+                    ) : (
+                        <p className="text-muted-foreground text-sm">Not signed in.</p>
+                    )}
+                </section>
 
                 {/* Appearance Section */}
                 <section className="rounded-xl border bg-card text-card-foreground p-6">

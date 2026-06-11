@@ -6,6 +6,35 @@ import { revalidatePath } from "next/cache";
 import { CalendarConfig, CustomDate, DEFAULT_CALENDAR } from "./calendar-engine";
 import { requireUserId } from "./auth";
 import cloudinary from "@/lib/cloudinary";
+import { PLANS, PlanKey } from "./quota";
+
+export async function checkQuota(userId: string, fileSize: number) {
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { plan: true, storageUsedBytes: true }
+    });
+    if (!user) throw new Error("User not found");
+
+    const planKey = (user.plan as PlanKey) || "free";
+    const limit = PLANS[planKey];
+
+    if (fileSize > limit.maxFileBytes) {
+        const limitMb = limit.maxFileBytes / (1024 * 1024);
+        return {
+            allowed: false,
+            error: `File size exceeds the ${limitMb}MB limit for your plan.`,
+        };
+    }
+
+    if (user.storageUsedBytes + fileSize > limit.maxBytes) {
+        return {
+            allowed: false,
+            error: "Storage quota exceeded. Please delete some files or upgrade to Pro.",
+        };
+    }
+
+    return { allowed: true, planLimit: limit };
+}
 
 async function requireOwnedWorld(worldId: string) {
     const userId = await requireUserId();
@@ -437,6 +466,82 @@ export async function deleteChapter(id: string, storyId: string) {
     revalidatePath(`/stories/${storyId}`);
     revalidatePath("/");
 }
+async function handleImageUploadAndTracking(
+    userId: string,
+    base64String: string | undefined | null,
+    oldUrl: string | undefined | null,
+    folder: string,
+    publicIdPrefix: string
+): Promise<{ url?: string; sizeDelta: number }> {
+    if (!base64String || !base64String.startsWith("data:")) {
+        return { sizeDelta: 0 };
+    }
+
+    const sizeInBytes = Math.round((base64String.length * 3) / 4);
+
+    let oldFileSize = 0;
+    let oldUploadedFileId = null;
+
+    if (oldUrl) {
+        const oldFileRecord = await prisma.uploadedFile.findUnique({
+            where: { url: oldUrl }
+        });
+        if (oldFileRecord) {
+            oldFileSize = oldFileRecord.size;
+            oldUploadedFileId = oldFileRecord.id;
+        }
+    }
+
+    const sizeDifference = sizeInBytes - oldFileSize;
+    const quotaCheck = await checkQuota(userId, sizeDifference);
+    if (!quotaCheck.allowed) {
+        throw new Error(quotaCheck.error);
+    }
+
+    const result = await cloudinary.uploader.upload(base64String, {
+        folder,
+        public_id: `${publicIdPrefix}-${Date.now()}`
+    });
+
+    const imageUrl = result.secure_url;
+    const uploadedBytes = result.bytes;
+
+    if (oldUploadedFileId) {
+        await prisma.uploadedFile.delete({ where: { id: oldUploadedFileId } });
+    }
+    await prisma.uploadedFile.create({
+        data: {
+            url: imageUrl,
+            size: uploadedBytes,
+            userId
+        }
+    });
+
+    await prisma.user.update({
+        where: { id: userId },
+        data: {
+            storageUsedBytes: {
+                increment: uploadedBytes - oldFileSize
+            }
+        }
+    });
+
+    if (oldUrl) {
+        try {
+            const parts = oldUrl.split("/storack/");
+            if (parts.length > 1) {
+                const pathWithExtension = "storack/" + parts[1];
+                const publicId = pathWithExtension.split(".")[0];
+                await cloudinary.uploader.destroy(publicId);
+            }
+        } catch (err) {
+            console.error("Failed to delete old image from Cloudinary:", err);
+        }
+    }
+
+    return { url: imageUrl, sizeDelta: uploadedBytes - oldFileSize };
+}
+
 // --- Characters ---
 export async function createCharacter(worldId: string, data: {
     name: string,
@@ -451,11 +556,25 @@ export async function createCharacter(worldId: string, data: {
     storyId?: string | null
 }) {
     await requireOwnedWorld(worldId);
+    const userId = await requireUserId();
+
+    let finalAvatarUrl = data.avatarUrl;
+    if (data.avatarUrl && data.avatarUrl.startsWith("data:")) {
+        const upload = await handleImageUploadAndTracking(
+            userId,
+            data.avatarUrl,
+            null,
+            "storack/avatars",
+            `char-${worldId}`
+        );
+        finalAvatarUrl = upload.url;
+    }
 
     const char = await prisma.character.create({
         data: {
             worldId,
-            ...data
+            ...data,
+            avatarUrl: finalAvatarUrl
         }
     });
     revalidatePath("/characters");
@@ -478,27 +597,70 @@ export async function updateCharacter(id: string, data: Partial<{
     backstory: string,
     storyId: string | null
 }>) {
-    await requireOwnedCharacter(id);
+    const char = await requireOwnedCharacter(id);
+    const userId = await requireUserId();
+
+    let finalAvatarUrl = data.avatarUrl;
+    if (data.avatarUrl && data.avatarUrl.startsWith("data:")) {
+        const upload = await handleImageUploadAndTracking(
+            userId,
+            data.avatarUrl,
+            char.avatarUrl,
+            "storack/avatars",
+            `char-${id}`
+        );
+        finalAvatarUrl = upload.url;
+    }
 
     const oldChar = await prisma.character.findUnique({ where: { id }, select: { storyId: true } });
 
-    const char = await prisma.character.update({
+    const updatedChar = await prisma.character.update({
         where: { id },
-        data
+        data: {
+            ...data,
+            avatarUrl: finalAvatarUrl
+        }
     });
     revalidatePath("/characters");
     revalidatePath("/world");
     if (oldChar?.storyId) {
         revalidatePath(`/stories/${oldChar.storyId}`);
     }
-    if (char.storyId && char.storyId !== oldChar?.storyId) {
-        revalidatePath(`/stories/${char.storyId}`);
+    if (updatedChar.storyId && updatedChar.storyId !== oldChar?.storyId) {
+        revalidatePath(`/stories/${updatedChar.storyId}`);
     }
-    return char;
+    return updatedChar;
 }
 
 export async function deleteCharacter(id: string) {
     const char = await requireOwnedCharacter(id);
+    const userId = await requireUserId();
+
+    if (char.avatarUrl) {
+        const fileRecord = await prisma.uploadedFile.findUnique({
+            where: { url: char.avatarUrl }
+        });
+        if (fileRecord) {
+            try {
+                const parts = char.avatarUrl.split("/storack/");
+                if (parts.length > 1) {
+                    const pathWithExtension = "storack/" + parts[1];
+                    const publicId = pathWithExtension.split(".")[0];
+                    await cloudinary.uploader.destroy(publicId);
+                }
+            } catch (err) {
+                console.error(err);
+            }
+            await prisma.$transaction([
+                prisma.uploadedFile.delete({ where: { id: fileRecord.id } }),
+                prisma.user.update({
+                    where: { id: userId },
+                    data: { storageUsedBytes: { decrement: fileRecord.size } }
+                })
+            ]);
+        }
+    }
+
     await prisma.character.delete({ where: { id } });
     revalidatePath("/characters");
     revalidatePath("/world");
@@ -510,6 +672,31 @@ export async function deleteCharacter(id: string) {
 // --- Locations ---
 export async function createLocation(worldId: string, data: { name: string, type?: string, description?: string, mapUrl?: string, imageUrl?: string, storyId?: string | null }) {
     await requireOwnedWorld(worldId);
+    const userId = await requireUserId();
+
+    let finalImageUrl = data.imageUrl;
+    if (data.imageUrl && data.imageUrl.startsWith("data:")) {
+        const upload = await handleImageUploadAndTracking(
+            userId,
+            data.imageUrl,
+            null,
+            "storack/locations",
+            `loc-img-${worldId}`
+        );
+        finalImageUrl = upload.url;
+    }
+
+    let finalMapUrl = data.mapUrl;
+    if (data.mapUrl && data.mapUrl.startsWith("data:")) {
+        const upload = await handleImageUploadAndTracking(
+            userId,
+            data.mapUrl,
+            null,
+            "storack/locations",
+            `loc-map-${worldId}`
+        );
+        finalMapUrl = upload.url;
+    }
 
     const loc = await prisma.location.create({
         data: {
@@ -517,8 +704,8 @@ export async function createLocation(worldId: string, data: { name: string, type
             name: data.name,
             type: data.type,
             description: data.description,
-            mapUrl: data.mapUrl,
-            imageUrl: data.imageUrl,
+            imageUrl: finalImageUrl,
+            mapUrl: finalMapUrl,
             storyId: data.storyId
         }
     });
@@ -530,26 +717,83 @@ export async function createLocation(worldId: string, data: { name: string, type
 }
 
 export async function updateLocation(id: string, data: Partial<{ name: string, type: string, description: string, mapUrl: string, imageUrl: string, storyId: string | null }>) {
-    await requireOwnedLocation(id);
+    const loc = await requireOwnedLocation(id);
+    const userId = await requireUserId();
+
+    let finalImageUrl = data.imageUrl;
+    if (data.imageUrl && data.imageUrl.startsWith("data:")) {
+        const upload = await handleImageUploadAndTracking(
+            userId,
+            data.imageUrl,
+            loc.imageUrl,
+            "storack/locations",
+            `loc-img-${id}`
+        );
+        finalImageUrl = upload.url;
+    }
+
+    let finalMapUrl = data.mapUrl;
+    if (data.mapUrl && data.mapUrl.startsWith("data:")) {
+        const upload = await handleImageUploadAndTracking(
+            userId,
+            data.mapUrl,
+            loc.mapUrl,
+            "storack/locations",
+            `loc-map-${id}`
+        );
+        finalMapUrl = upload.url;
+    }
 
     const oldLoc = await prisma.location.findUnique({ where: { id }, select: { storyId: true } });
 
-    const loc = await prisma.location.update({
+    const updatedLoc = await prisma.location.update({
         where: { id },
-        data
+        data: {
+            ...data,
+            imageUrl: finalImageUrl,
+            mapUrl: finalMapUrl
+        }
     });
     revalidatePath("/world");
     if (oldLoc?.storyId) {
         revalidatePath(`/stories/${oldLoc.storyId}`);
     }
-    if (loc.storyId && loc.storyId !== oldLoc?.storyId) {
-        revalidatePath(`/stories/${loc.storyId}`);
+    if (updatedLoc.storyId && updatedLoc.storyId !== oldLoc?.storyId) {
+        revalidatePath(`/stories/${updatedLoc.storyId}`);
     }
-    return loc;
+    return updatedLoc;
 }
 
 export async function deleteLocation(id: string) {
     const loc = await requireOwnedLocation(id);
+    const userId = await requireUserId();
+
+    const urlsToClean = [loc.imageUrl, loc.mapUrl].filter(Boolean) as string[];
+    for (const url of urlsToClean) {
+        const fileRecord = await prisma.uploadedFile.findUnique({
+            where: { url }
+        });
+        if (fileRecord) {
+            try {
+                const parts = url.split("/storack/");
+                if (parts.length > 1) {
+                    const pathWithExtension = "storack/" + parts[1];
+                    const publicId = pathWithExtension.split(".")[0];
+                    await cloudinary.uploader.destroy(publicId);
+                }
+            } catch (err) {
+                console.error(err);
+            }
+            await prisma.$transaction([
+                prisma.uploadedFile.delete({ where: { id: fileRecord.id } }),
+                prisma.user.update({
+                    where: { id: userId },
+                    data: { storageUsedBytes: { decrement: fileRecord.size } }
+                })
+            ]);
+        }
+    }
+
     await prisma.location.delete({ where: { id } });
     revalidatePath("/world");
     if (loc.storyId) {
@@ -558,10 +802,30 @@ export async function deleteLocation(id: string) {
 }
 
 export async function uploadStoryCover(id: string, formData: FormData) {
-    await requireOwnedStory(id);
+    const story = await requireOwnedStory(id);
+    const userId = await requireUserId();
 
     const file = formData.get("coverImage") as File;
     if (!file) return { error: "No file uploaded" };
+
+    let oldFileSize = 0;
+    let oldUploadedFileId = null;
+
+    if (story.coverImage) {
+        const oldFileRecord = await prisma.uploadedFile.findUnique({
+            where: { url: story.coverImage }
+        });
+        if (oldFileRecord) {
+            oldFileSize = oldFileRecord.size;
+            oldUploadedFileId = oldFileRecord.id;
+        }
+    }
+
+    const sizeDifference = file.size - oldFileSize;
+    const quotaCheck = await checkQuota(userId, sizeDifference);
+    if (!quotaCheck.allowed) {
+        return { error: quotaCheck.error };
+    }
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const base64 = `data:${file.type};base64,${buffer.toString("base64")}`;
@@ -572,10 +836,31 @@ export async function uploadStoryCover(id: string, formData: FormData) {
     });
 
     const imageUrl = result.secure_url;
+    const uploadedBytes = result.bytes;
 
-    await prisma.story.update({
-        where: { id },
-        data: { coverImage: imageUrl }
+    await prisma.$transaction(async (tx) => {
+        if (oldUploadedFileId) {
+            await tx.uploadedFile.delete({ where: { id: oldUploadedFileId } });
+        }
+        await tx.uploadedFile.create({
+            data: {
+                url: imageUrl,
+                size: uploadedBytes,
+                userId
+            }
+        });
+        await tx.user.update({
+            where: { id: userId },
+            data: {
+                storageUsedBytes: {
+                    increment: uploadedBytes - oldFileSize
+                }
+            }
+        });
+        await tx.story.update({
+            where: { id },
+            data: { coverImage: imageUrl }
+        });
     });
 
     revalidatePath("/");
@@ -585,10 +870,15 @@ export async function uploadStoryCover(id: string, formData: FormData) {
 }
 
 export async function uploadEditorImage(formData: FormData) {
-    await requireUserId();
+    const userId = await requireUserId();
 
     const file = formData.get("image") as File;
     if (!file) return { error: "No file uploaded" };
+
+    const quotaCheck = await checkQuota(userId, file.size);
+    if (!quotaCheck.allowed) {
+        return { error: quotaCheck.error };
+    }
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const base64 = `data:${file.type};base64,${buffer.toString("base64")}`;
@@ -597,7 +887,83 @@ export async function uploadEditorImage(formData: FormData) {
         folder: "storack/editor",
     });
 
+    const imageUrl = result.secure_url;
+    const uploadedBytes = result.bytes;
+
+    await prisma.$transaction(async (tx) => {
+        await tx.uploadedFile.create({
+            data: {
+                url: imageUrl,
+                size: uploadedBytes,
+                userId
+            }
+        });
+        await tx.user.update({
+            where: { id: userId },
+            data: {
+                storageUsedBytes: {
+                    increment: uploadedBytes
+                }
+            }
+        });
+    });
+
     return { success: true, imageUrl: result.secure_url };
+}
+
+export async function deleteUploadedFile(url: string) {
+    const userId = await requireUserId();
+
+    const fileRecord = await prisma.uploadedFile.findFirst({
+        where: { url, userId }
+    });
+    if (!fileRecord) throw new Error("File not found or not owned by you");
+
+    try {
+        const parts = url.split("/storack/");
+        if (parts.length > 1) {
+            const pathWithExtension = "storack/" + parts[1];
+            const publicId = pathWithExtension.split(".")[0];
+            await cloudinary.uploader.destroy(publicId);
+        }
+    } catch (err) {
+        console.error("Failed to delete image from Cloudinary:", err);
+    }
+
+    await prisma.$transaction(async (tx) => {
+        await tx.uploadedFile.delete({
+            where: { id: fileRecord.id }
+        });
+        await tx.user.update({
+            where: { id: userId },
+            data: {
+                storageUsedBytes: {
+                    decrement: fileRecord.size
+                }
+            }
+        });
+
+        await tx.story.updateMany({
+            where: { coverImage: url, world: { userId } },
+            data: { coverImage: null }
+        });
+        await tx.character.updateMany({
+            where: { avatarUrl: url, world: { userId } },
+            data: { avatarUrl: null }
+        });
+        await tx.location.updateMany({
+            where: { imageUrl: url, world: { userId } },
+            data: { imageUrl: null }
+        });
+        await tx.location.updateMany({
+            where: { mapUrl: url, world: { userId } },
+            data: { mapUrl: null }
+        });
+    });
+
+    revalidatePath("/");
+    revalidatePath("/settings");
+    return { success: true };
 }
 
 export async function updateChapterDates(id: string, dates: CustomDate[]) {

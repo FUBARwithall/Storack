@@ -21,7 +21,23 @@ model User {
   createdAt DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
 
+  plan                  String    @default("free") // "free" | "pro"
+  storageUsedBytes      Float     @default(0)
+  lemonCustomerId       String?   @unique
+  lemonSubscriptionId   String?   @unique
+  lemonPaidUntil        DateTime?
+
   worlds    World[]
+  uploadedFiles         UploadedFile[]
+}
+
+model UploadedFile {
+  id        String   @id @default(cuid())
+  url       String   @unique
+  size      Float
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
 }
 
 model World {

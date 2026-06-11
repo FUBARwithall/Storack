@@ -61,10 +61,12 @@ const accountItems = [
 
 export function Sidebar({
     className,
-    user
+    user,
+    plan = "free"
 }: {
     className?: string;
     user?: { id: string; username: string; avatarUrl?: string | null } | null;
+    plan?: string;
 }) {
 
     const { setTheme } = useTheme();
@@ -118,7 +120,7 @@ export function Sidebar({
                             <div className="flex flex-col items-start gap-0.5 text-left flex-1 min-w-0">
                                 <span className="text-sm font-semibold truncate w-full">{user?.username || 'Guest User'}</span>
                                 <span className="text-xs text-muted-foreground uppercase font-bold tracking-wide">
-                                    {user ? 'Pro Writer' : 'Free Tier'}
+                                    {user ? (plan === "pro" ? "Pro Writer" : "Free Writer") : "Free Tier"}
                                 </span>
                             </div>
 
@@ -182,8 +184,10 @@ export function Sidebar({
 
 export function MobileNav({
     user,
+    plan = "free"
 }: {
     user?: { id: string; username: string; avatarUrl?: string | null } | null;
+    plan?: string;
 }) {
     const { setTheme } = useTheme();
     const pathname = usePathname();
@@ -213,7 +217,7 @@ export function MobileNav({
                             <span className="min-w-0">
                                 <span className="block truncate text-base">{user?.username || 'Guest User'}</span>
                                 <span className="block text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                                    Mobile Workspace
+                                    {plan === "pro" ? "Pro Writer" : "Free Writer"}
                                 </span>
                             </span>
                         </SheetTitle>

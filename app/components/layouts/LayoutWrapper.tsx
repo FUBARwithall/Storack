@@ -5,10 +5,12 @@ import { MobileNav, Sidebar } from "./Sidebar";
 
 export default function LayoutWrapper({
     children,
-    user
+    user,
+    plan = "free"
 }: {
     children: React.ReactNode;
     user?: { id: string; username: string; avatarUrl?: string | null } | null;
+    plan?: string;
 }) {
     const pathname = usePathname();
     const isAuthPage = pathname === "/auth";
@@ -19,9 +21,9 @@ export default function LayoutWrapper({
 
     return (
         <div className="flex h-full w-full">
-            <Sidebar user={user} className="hidden md:flex border-r border-border" />
+            <Sidebar user={user} plan={plan} className="hidden md:flex border-r border-border" />
             <div className="flex min-w-0 flex-1 flex-col">
-                <MobileNav user={user} />
+                <MobileNav user={user} plan={plan} />
                 <main className="flex-1 overflow-y-auto w-full">
                     {children}
                 </main>

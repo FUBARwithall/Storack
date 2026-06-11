@@ -32,6 +32,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { Toaster } from "@/components/ui/sonner"
 import { getSession } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 
 export default async function RootLayout({
   children,
@@ -39,6 +40,17 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const session = await getSession();
+  
+  let plan = "free";
+  if (session?.user?.id) {
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { plan: true }
+    });
+    if (user) {
+      plan = user.plan;
+    }
+  }
 
   return (
     <html lang="en" suppressHydrationWarning className="h-full overflow-hidden">
@@ -52,7 +64,7 @@ export default async function RootLayout({
           disableTransitionOnChange
         >
           <TooltipProvider>
-            <LayoutWrapper user={session?.user}>
+            <LayoutWrapper user={session?.user} plan={plan}>
               {children}
             </LayoutWrapper>
             <Toaster position="bottom-right" />

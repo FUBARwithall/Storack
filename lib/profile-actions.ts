@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import { getSession, updateSessionUser } from "./auth";
 import { revalidatePath } from "next/cache";
 import cloudinary from "@/lib/cloudinary";
+import { checkQuota } from "./actions";
 
 export async function updateProfileAction(formData: FormData) {
     const session = await getSession();
@@ -57,7 +58,27 @@ export async function updateProfileAction(formData: FormData) {
     }
 
     // 3. Avatar Upload Check
+    let oldAvatarSize = 0;
+    let oldUploadedFileId = null;
+    let uploadBytes = 0;
+
     if (avatarFile && avatarFile.size > 0) {
+        if (user.avatarUrl) {
+            const oldFileRecord = await prisma.uploadedFile.findUnique({
+                where: { url: user.avatarUrl }
+            });
+            if (oldFileRecord) {
+                oldAvatarSize = oldFileRecord.size;
+                oldUploadedFileId = oldFileRecord.id;
+            }
+        }
+
+        const sizeDifference = avatarFile.size - oldAvatarSize;
+        const quotaCheck = await checkQuota(userId, sizeDifference);
+        if (!quotaCheck.allowed) {
+            return { error: quotaCheck.error };
+        }
+
         try {
             const buffer = Buffer.from(await avatarFile.arrayBuffer());
             const base64 = `data:${avatarFile.type};base64,${buffer.toString("base64")}`;
@@ -66,6 +87,7 @@ export async function updateProfileAction(formData: FormData) {
                 public_id: `user-${userId}-${Date.now()}`,
             });
             updateData.avatarUrl = uploadResult.secure_url;
+            uploadBytes = uploadResult.bytes;
         } catch (error) {
             console.error("Avatar upload failed:", error);
             return { error: "Failed to upload avatar image" };
@@ -74,10 +96,34 @@ export async function updateProfileAction(formData: FormData) {
 
     // Perform database update if there is any new data
     if (Object.keys(updateData).length > 0) {
-        await prisma.user.update({
-            where: { id: userId },
-            data: updateData,
-        });
+        if (updateData.avatarUrl) {
+            await prisma.$transaction(async (tx) => {
+                if (oldUploadedFileId) {
+                    await tx.uploadedFile.delete({ where: { id: oldUploadedFileId } });
+                }
+                await tx.uploadedFile.create({
+                    data: {
+                        url: updateData.avatarUrl!,
+                        size: uploadBytes,
+                        userId
+                    }
+                });
+                await tx.user.update({
+                    where: { id: userId },
+                    data: {
+                        ...updateData,
+                        storageUsedBytes: {
+                            increment: uploadBytes - oldAvatarSize
+                        }
+                    },
+                });
+            });
+        } else {
+            await prisma.user.update({
+                where: { id: userId },
+                data: updateData,
+            });
+        }
 
         // Sync local cookie session
         const sessionUpdates: { username?: string; avatarUrl?: string } = {};
