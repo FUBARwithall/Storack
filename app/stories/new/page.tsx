@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, BookOpen, Upload, Image as ImageIcon, Loader2 } from "lucide-react";
+import { ArrowLeft, BookOpen, Upload, Image as ImageIcon, Loader2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState, useRef } from "react";
@@ -103,9 +103,9 @@ export default function NewStoryPage() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-8">
-                <form onSubmit={handleSubmit} className="mx-auto max-w-2xl space-y-10">
+                <form onSubmit={handleSubmit} className="mx-auto max-w-2xl space-y-6">
 
-                    <div className="space-y-4">
+                    <div className="space-y-2">
                         <label className="block text-sm font-semibold text-foreground/80">Project Title</label>
                         <Input
                             required
@@ -117,8 +117,8 @@ export default function NewStoryPage() {
                         />
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
                             <label className="block text-sm font-semibold text-foreground/80">Genre</label>
                             <select
                                 value={genre}
@@ -132,45 +132,42 @@ export default function NewStoryPage() {
                             </select>
                         </div>
 
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <label className="block text-sm font-semibold text-foreground/80">Cover Image</label>
-                            <div className="flex items-center gap-4">
-                                <div
-                                    className="relative h-24 w-16 shrink-0 border-2 border-dashed border-muted-foreground/30 rounded-lg overflow-hidden flex items-center justify-center cursor-pointer hover:border-primary/50 transition-all group"
-                                    onClick={() => fileInputRef.current?.click()}
-                                >
-                                    {coverImage ? (
-                                        <img src={coverImage} alt="Preview" className="h-full w-full object-cover group-hover:scale-110 transition-transform" />
-                                    ) : (
-                                        <ImageIcon className="h-6 w-6 text-muted-foreground" />
-                                    )}
-                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-all">
-                                        <Upload className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    </div>
-                                </div>
-                                <div className="space-y-1">
-                                    <Button
+                            <div
+                                className="relative w-full h-10 rounded-md border border-dashed border-muted-foreground/30 bg-card/50 flex items-center gap-3 px-3 cursor-pointer hover:border-primary/50 transition-all group overflow-hidden"
+                                onClick={() => fileInputRef.current?.click()}
+                            >
+                                {coverImage ? (
+                                    <img src={coverImage} alt="Preview" className="h-7 w-5 object-cover rounded shrink-0" />
+                                ) : (
+                                    <ImageIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+                                )}
+                                <span className="text-sm text-muted-foreground truncate flex-1">
+                                    {coverImage ? "Image selected — click to change" : "Choose File  ·  PNG, JPG up to 10MB"}
+                                </span>
+                                {isUploading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />}
+                                {coverImage && (
+                                    <button
                                         type="button"
-                                        variant="outline"
-                                        size="xs"
-                                        onClick={() => fileInputRef.current?.click()}
+                                        onClick={(e) => { e.stopPropagation(); setCoverImage(""); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+                                        className="shrink-0 rounded-full p-0.5 hover:bg-muted-foreground/20 text-muted-foreground hover:text-foreground transition-colors"
                                     >
-                                        Choose File
-                                    </Button>
-                                    <p className="text-[10px] text-muted-foreground">PNG, JPG up to 10MB</p>
-                                    <input
-                                        type="file"
-                                        ref={fileInputRef}
-                                        className="hidden"
-                                        accept="image/*"
-                                        onChange={handleFileChange}
-                                    />
-                                </div>
+                                        <X className="h-3.5 w-3.5" />
+                                    </button>
+                                )}
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    className="hidden"
+                                    accept="image/*"
+                                    onChange={handleFileChange}
+                                />
                             </div>
                         </div>
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="space-y-2">
                         <label className="block text-sm font-semibold text-foreground/80">Synopsis</label>
                         <textarea
                             rows={6}

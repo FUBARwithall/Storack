@@ -6,8 +6,20 @@ export default async function CharactersPage() {
     const world = await getOrCreateDefaultWorld();
     const characters = await prisma.character.findMany({
         where: { worldId: world.id },
+        include: { story: true },
         orderBy: { name: 'asc' }
     });
 
-    return <CharactersClient initialCharacters={characters} worldId={world.id} />;
+    const stories = await prisma.story.findMany({
+        where: { worldId: world.id },
+        orderBy: { title: 'asc' }
+    });
+
+    return (
+        <CharactersClient
+            initialCharacters={characters}
+            worldId={world.id}
+            stories={stories}
+        />
+    );
 }

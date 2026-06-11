@@ -27,14 +27,18 @@ interface Character {
     personality: string | null;
     backstory: string | null;
     worldId: string;
+    storyId?: string | null;
+    story?: { id: string, title: string } | null;
 }
 
 interface CharactersClientProps {
     initialCharacters: Character[];
     worldId: string;
+    storyId?: string;
+    stories?: any[];
 }
 
-export function CharactersClient({ initialCharacters, worldId }: CharactersClientProps) {
+export function CharactersClient({ initialCharacters, worldId, storyId, stories = [] }: CharactersClientProps) {
     const router = useRouter();
     const [searchTerm, setSearchTerm] = useState("");
     const [viewMode, setViewMode] = useState<'list' | 'form'>('list');
@@ -69,6 +73,8 @@ export function CharactersClient({ initialCharacters, worldId }: CharactersClien
             <div className="p-6 md:p-8 w-full max-w-full mx-auto animate-in fade-in duration-500">
                 <CharacterForm
                     worldId={worldId}
+                    storyId={storyId}
+                    stories={stories}
                     character={editingCharacter}
                     onSave={() => {
                         setViewMode('list');
@@ -122,6 +128,12 @@ export function CharactersClient({ initialCharacters, worldId }: CharactersClien
                                     <User className="h-20 w-20 text-muted-foreground opacity-30" />
                                 )}
 
+                                {char.story && (
+                                    <div className="absolute top-2 left-2 z-10 rounded-full bg-background/80 backdrop-blur-md border border-border px-2.5 py-0.5 text-[10px] font-medium text-foreground shadow-sm">
+                                        {char.story.title}
+                                    </div>
+                                )}
+
                                 <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
@@ -152,7 +164,7 @@ export function CharactersClient({ initialCharacters, worldId }: CharactersClien
                                     <h3 className="text-base font-bold text-foreground leading-tight group-hover:text-primary transition-colors truncate">
                                         {char.name}
                                     </h3>
-                                    <span className="text-[10px] font-bold uppercase tracking-widest text-primary shrink-0 opacity-90">
+                                    <span className="text-[10px] font-bold uppercase tracking-widest text-primary opacity-90 shrink-0">
                                         {char.role || "Character"}
                                     </span>
                                 </div>

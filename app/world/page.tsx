@@ -8,12 +8,19 @@ export default async function WorldPage() {
     // Fetch locations and characters from database
     const locations = await prisma.location.findMany({
         where: { worldId: world.id },
+        include: { story: true },
         orderBy: { name: 'asc' }
     });
 
     const characters = await prisma.character.findMany({
         where: { worldId: world.id },
+        include: { story: true },
         orderBy: { name: 'asc' }
+    });
+
+    const stories = await prisma.story.findMany({
+        where: { worldId: world.id },
+        orderBy: { title: 'asc' }
     });
 
     return (
@@ -21,6 +28,7 @@ export default async function WorldPage() {
             initialLocations={locations}
             initialCharacters={characters}
             worldId={world.id}
+            stories={stories}
         />
     );
 }

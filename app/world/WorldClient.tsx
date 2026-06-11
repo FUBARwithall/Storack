@@ -22,6 +22,8 @@ interface Location {
     description: string | null;
     mapUrl: string | null;
     imageUrl: string | null;
+    storyId?: string | null;
+    story?: { id: string, title: string } | null;
 }
 
 interface Character {
@@ -35,12 +37,16 @@ interface Character {
     occupation: string | null;
     personality: string | null;
     backstory: string | null;
+    storyId?: string | null;
+    story?: { id: string, title: string } | null;
 }
 
 interface WorldClientProps {
     initialLocations: Location[];
     initialCharacters: Character[];
     worldId: string;
+    storyId?: string;
+    stories?: any[];
 }
 
 const TypeIcon = ({ type }: { type: string }) => {
@@ -55,7 +61,7 @@ const TypeIcon = ({ type }: { type: string }) => {
     }
 };
 
-export function WorldClient({ initialLocations, initialCharacters, worldId }: WorldClientProps) {
+export function WorldClient({ initialLocations, initialCharacters, worldId, storyId, stories = [] }: WorldClientProps) {
     const router = useRouter();
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedCategory, setSelectedCategory] = useState("All");
@@ -122,6 +128,8 @@ export function WorldClient({ initialLocations, initialCharacters, worldId }: Wo
             <div className="p-6 md:p-8 w-full max-w-full mx-auto animate-in fade-in duration-500">
                 <CharacterForm
                     worldId={worldId}
+                    storyId={storyId}
+                    stories={stories}
                     character={editingChar}
                     onSave={() => {
                         setViewMode('list');
@@ -138,6 +146,8 @@ export function WorldClient({ initialLocations, initialCharacters, worldId }: Wo
             <div className="p-6 md:p-8 w-full max-w-full mx-auto animate-in fade-in duration-500">
                 <WorldEntryForm
                     worldId={worldId}
+                    storyId={storyId}
+                    stories={stories}
                     entry={editingEntry}
                     onSave={() => {
                         setViewMode('list');
@@ -197,32 +207,37 @@ export function WorldClient({ initialLocations, initialCharacters, worldId }: Wo
                     {filteredItems.map((item) => (
                         <div
                             key={`${item.sourceType}-${item.id}`}
-                            className="group flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-border bg-card/60 backdrop-blur-sm p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:border-primary/30 hover:bg-card/80"
+                            className="group flex items-center justify-between gap-3 rounded-2xl border border-border bg-card/60 backdrop-blur-sm p-4 shadow-sm transition-all duration-300 hover:shadow-md hover:border-primary/30 hover:bg-card/80"
                         >
-                            <div className="flex items-start gap-5">
-                                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-secondary text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors duration-300 shadow-inner overflow-hidden">
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                                <div className="flex h-12 w-12 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-xl bg-secondary text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors duration-300 shadow-inner overflow-hidden">
                                     {item.avatarUrl ? (
                                         <img src={item.avatarUrl} alt={item.name} className="h-full w-full object-cover" />
                                     ) : (
                                         <TypeIcon type={item.type || 'Location'} />
                                     )}
                                 </div>
-                                <div className="pl-6">
-                                    <div className="flex items-center gap-3">
-                                        <h3 className="text-lg font-bold text-foreground group-hover:text-primary transition-colors">{item.name}</h3>
-                                        <span className="rounded-full bg-secondary/80 border border-muted px-2.5 py-0.5 text-xs font-bold uppercase tracking-widest text-muted-foreground whitespace-nowrap">
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <h3 className="text-base sm:text-lg font-bold text-foreground group-hover:text-primary transition-colors truncate">{item.name}</h3>
+                                        <span className="rounded-full bg-secondary/80 border border-muted px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
                                             {item.type || 'Entry'}
                                         </span>
+                                        {item.story && (
+                                            <span className="rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-semibold text-primary whitespace-nowrap">
+                                                Story: {item.story.title}
+                                            </span>
+                                        )}
                                     </div>
-                                    <p className="mt-1 text-xs text-muted-foreground font-medium">{item.description}</p>
+                                    <p className="mt-1 text-xs text-muted-foreground font-medium truncate sm:whitespace-normal">{item.description}</p>
                                 </div>
                             </div>
 
-                            <div className="flex items-center self-end sm:self-center">
+                            <div className="flex items-center shrink-0">
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-primary/10 transition-colors">
-                                            <MoreHorizontal className="h-5 w-5" />
+                                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-primary/10 transition-colors">
+                                            <MoreHorizontal className="h-4.5 w-4.5" />
                                         </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end" className="w-40">

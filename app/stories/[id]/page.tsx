@@ -32,12 +32,12 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     const calendars = await getCalendars(story.worldId);
 
     const characters = await prisma.character.findMany({
-        where: { worldId: story.worldId },
+        where: { storyId: id },
         orderBy: { name: 'asc' }
     });
 
     const locations = await prisma.location.findMany({
-        where: { worldId: story.worldId },
+        where: { storyId: id },
         orderBy: { name: 'asc' }
     });
 
@@ -73,7 +73,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                         </div>
 
                         <div className="min-w-0 self-start">
-                            <div className="flex min-w-0 flex-col items-start gap-1 sm:flex-row sm:gap-3">
+                            <div className="flex min-w-0 flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-3">
                                 <h1 className="max-w-full break-words text-2xl font-bold text-foreground tracking-tight leading-tight sm:text-3xl">{story.title}</h1>
                                 <Badge variant={story.status === 'Completed' ? 'default' : 'secondary'} className="hidden px-2.5 py-0.5 shrink-0 sm:inline-flex">
                                     {story.status}
@@ -128,7 +128,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
 
             {/* Main Content with Tabs */}
             <Tabs defaultValue="overview" className="flex-1 flex flex-col">
-                <div className="border-y bg-background/50 backdrop-blur-sm sticky top-0 z-10 overflow-x-auto px-4 sm:px-8">
+                <div className="border-y bg-background/50 backdrop-blur-sm sticky top-0 z-10 overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-4 sm:px-8">
                     <TabsList className="bg-transparent h-auto w-max min-w-max p-0 gap-2 rounded-none border-b-0">
                         <TabsTrigger
                             value="overview"
@@ -184,30 +184,31 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                                     </div>
                                 </div>
 
-
-
                                 <div className="space-y-3">
                                     {story.chapters.length > 0 ? (
                                         story.chapters.sort((a, b) => a.order - b.order).map((chapter) => (
-                                            <Card key={chapter.id} className="group hover:border-primary/50 transition-all duration-300 hover:shadow-md hover:shadow-primary/5 active:scale-[0.99] active:border-primary/50 active:bg-primary/5 bg-card border-border">
-                                                <CardContent className="flex items-center justify-between p-4">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary text-xs font-bold text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300">
+                                            <Card key={chapter.id} className="relative group hover:border-primary/50 transition-all duration-300 hover:shadow-md hover:shadow-primary/5 active:scale-[0.99] active:border-primary/50 active:bg-primary/5 bg-card border-border">
+                                                {/* Card overlay → hub */}
+                                                <Link href={`/stories/${story.id}/chapters/${chapter.id}`} className="absolute inset-0 z-0" aria-label={chapter.title} />
+                                                <CardContent className="flex items-center justify-between p-3 sm:p-4">
+                                                    <div className="flex items-center gap-3 min-w-0">
+                                                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-secondary text-xs font-bold text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300">
                                                             {chapter.order}
                                                         </div>
-                                                        <div>
-                                                            <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors font-serif text-base">
-                                                                <Link href={`/stories/${story.id}/editor/${chapter.id}`} className="hover:underline">
+                                                        <div className="min-w-0">
+                                                            <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors font-serif text-sm sm:text-base truncate">
+                                                                {/* Title → editor directly */}
+                                                                <Link href={`/stories/${story.id}/editor/${chapter.id}`} className="relative z-10 hover:underline">
                                                                     {chapter.title}
                                                                 </Link>
                                                             </h3>
-                                                            <p className="text-xs text-muted-foreground mt-0.5 font-body">
-                                                                {chapter.wordCount.toLocaleString()} words • Last edited {formatRelativeTime(chapter.lastEdited)}
+                                                            <p className="text-xs text-muted-foreground mt-0.5 font-body truncate">
+                                                                {chapter.wordCount.toLocaleString()} words • {formatRelativeTime(chapter.lastEdited)}
                                                             </p>
                                                         </div>
                                                     </div>
 
-                                                    <div className="flex items-center gap-4">
+                                                    <div className="relative z-10 flex shrink-0 items-center gap-2 sm:gap-4 ml-2">
                                                         <Badge
                                                             variant={chapter.status === 'Completed' ? 'default' : 'outline'}
                                                             className={cn(
@@ -216,7 +217,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                                                         >
                                                             {chapter.status}
                                                         </Badge>
-                                                        <Button variant="ghost" size="icon" className="h-8 w-8 active:scale-90 active:bg-muted">
+                                                        <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8 active:scale-90 active:bg-muted">
                                                             <MoreVertical className="h-4 w-4" />
                                                         </Button>
                                                     </div>
@@ -248,6 +249,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                         <CharactersClient
                             initialCharacters={characters}
                             worldId={story.worldId}
+                            storyId={id}
+                            stories={[story]}
                         />
                     </TabsContent>
                     <TabsContent value="world" className="m-0">
@@ -255,6 +258,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                             initialCharacters={characters}
                             initialLocations={locations}
                             worldId={story.worldId}
+                            storyId={id}
+                            stories={[story]}
                         />
                     </TabsContent>
                     <TabsContent value="timeline" className="m-0 p-4 sm:p-8">

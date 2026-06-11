@@ -61,7 +61,7 @@ export default async function Home() {
             <p className="text-sm text-foreground/65 leading-relaxed italic font-body max-w-sm">
               {inspirationLine}
             </p>
-            <div className="flex gap-4 pt-0.5 md:gap-6 md:pt-1 text-xs font-semibold text-foreground/70 font-body">
+            <div className="flex flex-col gap-1 pt-0.5 md:pt-1 text-xs font-semibold text-foreground/70 font-body">
               <span className="flex items-center gap-1.5">Words Written: <strong className="text-foreground font-serif">{totalWords.toLocaleString()}</strong></span>
               <span className="flex items-center gap-1.5">Active Projects: <strong className="text-foreground font-serif">{activeProjects}</strong></span>
             </div>

@@ -12,6 +12,8 @@ import { Globe, MapPin, Shield, Book, Zap, Box, Loader2, ChevronLeft, Upload, X 
 
 interface WorldEntryFormProps {
     worldId: string;
+    storyId?: string;
+    stories?: any[];
     entry?: any;
     onSave: () => void;
     onCancel: () => void;
@@ -25,12 +27,13 @@ const CATEGORIES = [
     { value: 'Object', icon: <Box className="h-4 w-4" /> },
 ];
 
-export function WorldEntryForm({ worldId, entry, onSave, onCancel }: WorldEntryFormProps) {
-    const [name, setName] = useState("");
-    const [type, setType] = useState("Location");
-    const [description, setDescription] = useState("");
-    const [mapUrl, setMapUrl] = useState("");
-    const [imageUrl, setImageUrl] = useState("");
+export function WorldEntryForm({ worldId, storyId, stories = [], entry, onSave, onCancel }: WorldEntryFormProps) {
+    const [name, setName] = useState(entry?.name || "");
+    const [type, setType] = useState(entry?.type || "Location");
+    const [description, setDescription] = useState(entry?.description || "");
+    const [mapUrl, setMapUrl] = useState(entry?.mapUrl || "");
+    const [imageUrl, setImageUrl] = useState(entry?.imageUrl || "");
+    const [selectedStoryId, setSelectedStoryId] = useState(entry?.storyId || storyId || "none");
     const [isLoading, setIsLoading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -43,8 +46,11 @@ export function WorldEntryForm({ worldId, entry, onSave, onCancel }: WorldEntryF
             setDescription(entry.description || "");
             setMapUrl(entry.mapUrl || "");
             setImageUrl(entry.imageUrl || "");
+            setSelectedStoryId(entry.storyId || "none");
+        } else {
+            setSelectedStoryId(storyId || "none");
         }
-    }, [entry]);
+    }, [entry, storyId]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -63,22 +69,18 @@ export function WorldEntryForm({ worldId, entry, onSave, onCancel }: WorldEntryF
 
         setIsLoading(true);
         try {
+            const data = {
+                name,
+                type,
+                description,
+                mapUrl: mapUrl || undefined,
+                imageUrl: imageUrl || undefined,
+                storyId: selectedStoryId === "none" ? null : selectedStoryId
+            };
             if (isEdit) {
-                await updateLocation(entry.id, {
-                    name,
-                    type,
-                    description,
-                    mapUrl: mapUrl || undefined,
-                    imageUrl: imageUrl || undefined
-                });
+                await updateLocation(entry.id, data);
             } else {
-                await createLocation(worldId, {
-                    name,
-                    type,
-                    description,
-                    mapUrl: mapUrl || undefined,
-                    imageUrl: imageUrl || undefined
-                });
+                await createLocation(worldId, data);
             }
             onSave();
         } catch (error) {
@@ -138,7 +140,7 @@ export function WorldEntryForm({ worldId, entry, onSave, onCancel }: WorldEntryF
 
                         {/* Form Fields */}
                         <div className="space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <div className="space-y-2">
                                     <Label htmlFor="name" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Entry Name</Label>
                                     <Input
@@ -164,6 +166,23 @@ export function WorldEntryForm({ worldId, entry, onSave, onCancel }: WorldEntryF
                                                         {cat.icon}
                                                         <span>{cat.value}</span>
                                                     </div>
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="story" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Associated Story</Label>
+                                    <Select value={selectedStoryId} onValueChange={setSelectedStoryId}>
+                                        <SelectTrigger id="story" className="h-11 bg-card/50">
+                                            <SelectValue placeholder="Global (World-wide)" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">Global (World-wide)</SelectItem>
+                                            {stories.map((s: any) => (
+                                                <SelectItem key={s.id} value={s.id}>
+                                                    {s.title}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>

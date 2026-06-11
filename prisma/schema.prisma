@@ -104,6 +104,8 @@ model Chapter {
   story     Story?   @relation(fields: [storyId], references: [id], onDelete: Cascade)
   
   events    TimelineEvent[]
+  characters Character[]
+  locations  Location[]
 
   createdAt DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
@@ -124,6 +126,8 @@ model Story {
   world       World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
   
   chapters    Chapter[]
+  characters  Character[]
+  locations   Location[]
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
@@ -143,6 +147,10 @@ model Character {
 
   worldId     String
   world       World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  
+  storyId     String?
+  story       Story?   @relation(fields: [storyId], references: [id], onDelete: SetNull)
+  chapters    Chapter[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
@@ -158,6 +166,11 @@ model Location {
 
   worldId     String
   world       World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  
+  storyId     String?
+  story       Story?   @relation(fields: [storyId], references: [id], onDelete: SetNull)
+  chapters    Chapter[]
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
 }

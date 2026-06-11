@@ -303,6 +303,10 @@ export async function getChapterById(id: string) {
             id,
             world: { userId },
         },
+        include: {
+            characters: true,
+            locations: true,
+        }
     });
     return chapter;
 }
@@ -443,7 +447,8 @@ export async function createCharacter(worldId: string, data: {
     species?: string,
     occupation?: string,
     personality?: string,
-    backstory?: string
+    backstory?: string,
+    storyId?: string | null
 }) {
     await requireOwnedWorld(worldId);
 
@@ -455,6 +460,9 @@ export async function createCharacter(worldId: string, data: {
     });
     revalidatePath("/characters");
     revalidatePath("/world");
+    if (data.storyId) {
+        revalidatePath(`/stories/${data.storyId}`);
+    }
     return char;
 }
 
@@ -467,9 +475,12 @@ export async function updateCharacter(id: string, data: Partial<{
     species: string,
     occupation: string,
     personality: string,
-    backstory: string
+    backstory: string,
+    storyId: string | null
 }>) {
     await requireOwnedCharacter(id);
+
+    const oldChar = await prisma.character.findUnique({ where: { id }, select: { storyId: true } });
 
     const char = await prisma.character.update({
         where: { id },
@@ -477,18 +488,27 @@ export async function updateCharacter(id: string, data: Partial<{
     });
     revalidatePath("/characters");
     revalidatePath("/world");
+    if (oldChar?.storyId) {
+        revalidatePath(`/stories/${oldChar.storyId}`);
+    }
+    if (char.storyId && char.storyId !== oldChar?.storyId) {
+        revalidatePath(`/stories/${char.storyId}`);
+    }
     return char;
 }
 
 export async function deleteCharacter(id: string) {
-    await requireOwnedCharacter(id);
+    const char = await requireOwnedCharacter(id);
     await prisma.character.delete({ where: { id } });
     revalidatePath("/characters");
     revalidatePath("/world");
+    if (char.storyId) {
+        revalidatePath(`/stories/${char.storyId}`);
+    }
 }
 
 // --- Locations ---
-export async function createLocation(worldId: string, data: { name: string, type?: string, description?: string, mapUrl?: string, imageUrl?: string }) {
+export async function createLocation(worldId: string, data: { name: string, type?: string, description?: string, mapUrl?: string, imageUrl?: string, storyId?: string | null }) {
     await requireOwnedWorld(worldId);
 
     const loc = await prisma.location.create({
@@ -498,28 +518,43 @@ export async function createLocation(worldId: string, data: { name: string, type
             type: data.type,
             description: data.description,
             mapUrl: data.mapUrl,
-            imageUrl: data.imageUrl
+            imageUrl: data.imageUrl,
+            storyId: data.storyId
         }
     });
     revalidatePath("/world");
+    if (data.storyId) {
+        revalidatePath(`/stories/${data.storyId}`);
+    }
     return loc;
 }
 
-export async function updateLocation(id: string, data: Partial<{ name: string, type: string, description: string, mapUrl: string, imageUrl: string }>) {
+export async function updateLocation(id: string, data: Partial<{ name: string, type: string, description: string, mapUrl: string, imageUrl: string, storyId: string | null }>) {
     await requireOwnedLocation(id);
+
+    const oldLoc = await prisma.location.findUnique({ where: { id }, select: { storyId: true } });
 
     const loc = await prisma.location.update({
         where: { id },
         data
     });
     revalidatePath("/world");
+    if (oldLoc?.storyId) {
+        revalidatePath(`/stories/${oldLoc.storyId}`);
+    }
+    if (loc.storyId && loc.storyId !== oldLoc?.storyId) {
+        revalidatePath(`/stories/${loc.storyId}`);
+    }
     return loc;
 }
 
 export async function deleteLocation(id: string) {
-    await requireOwnedLocation(id);
+    const loc = await requireOwnedLocation(id);
     await prisma.location.delete({ where: { id } });
     revalidatePath("/world");
+    if (loc.storyId) {
+        revalidatePath(`/stories/${loc.storyId}`);
+    }
 }
 
 export async function uploadStoryCover(id: string, formData: FormData) {
@@ -580,3 +615,30 @@ export async function updateChapterDates(id: string, dates: CustomDate[]) {
     return chapter;
 }
 
+export async function updateChapterWorldElements(chapterId: string, data: { characterIds: string[], locationIds: string[] }) {
+    await requireOwnedChapter(chapterId);
+
+    const chapter = await prisma.chapter.update({
+        where: { id: chapterId },
+        data: {
+            characters: {
+                set: data.characterIds.map(id => ({ id }))
+            },
+            locations: {
+                set: data.locationIds.map(id => ({ id }))
+            }
+        },
+        include: {
+            characters: true,
+            locations: true
+        }
+    });
+
+    revalidatePath("/");
+    if (chapter.storyId) {
+        revalidatePath(`/stories/${chapter.storyId}`);
+        revalidatePath(`/stories/${chapter.storyId}/chapters/${chapter.id}`);
+        revalidatePath(`/stories/${chapter.storyId}/chapters/${chapter.id}/cast`);
+    }
+    return chapter;
+}

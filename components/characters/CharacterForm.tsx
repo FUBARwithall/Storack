@@ -12,21 +12,24 @@ import { Loader2, Upload, X, UserCircle, ChevronLeft } from "lucide-react";
 
 interface CharacterFormProps {
     worldId: string;
+    storyId?: string;
+    stories?: any[];
     character?: any;
     onSave: () => void;
     onCancel: () => void;
 }
 
-export function CharacterForm({ worldId, character, onSave, onCancel }: CharacterFormProps) {
-    const [name, setName] = useState("");
-    const [role, setRole] = useState("Supporting");
-    const [avatarUrl, setAvatarUrl] = useState("");
-    const [age, setAge] = useState("");
-    const [gender, setGender] = useState("");
-    const [species, setSpecies] = useState("");
-    const [occupation, setOccupation] = useState("");
-    const [personality, setPersonality] = useState("");
-    const [backstory, setBackstory] = useState("");
+export function CharacterForm({ worldId, storyId, stories = [], character, onSave, onCancel }: CharacterFormProps) {
+    const [name, setName] = useState(character?.name || "");
+    const [role, setRole] = useState(character?.role || "Supporting");
+    const [avatarUrl, setAvatarUrl] = useState(character?.avatarUrl || "");
+    const [age, setAge] = useState(character?.age || "");
+    const [gender, setGender] = useState(character?.gender || "");
+    const [species, setSpecies] = useState(character?.species || "");
+    const [occupation, setOccupation] = useState(character?.occupation || "");
+    const [personality, setPersonality] = useState(character?.personality || "");
+    const [backstory, setBackstory] = useState(character?.backstory || "");
+    const [selectedStoryId, setSelectedStoryId] = useState(character?.storyId || storyId || "none");
 
     const [isLoading, setIsLoading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -44,8 +47,11 @@ export function CharacterForm({ worldId, character, onSave, onCancel }: Characte
             setOccupation(character.occupation || "");
             setPersonality(character.personality || "");
             setBackstory(character.backstory || "");
+            setSelectedStoryId(character.storyId || "none");
+        } else {
+            setSelectedStoryId(storyId || "none");
         }
-    }, [character]);
+    }, [character, storyId]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -64,7 +70,8 @@ export function CharacterForm({ worldId, character, onSave, onCancel }: Characte
 
         setIsLoading(true);
         const data = {
-            name, role, avatarUrl, age, gender, species, occupation, personality, backstory
+            name, role, avatarUrl, age, gender, species, occupation, personality, backstory,
+            storyId: selectedStoryId === "none" ? null : selectedStoryId
         };
 
         try {
@@ -138,7 +145,7 @@ export function CharacterForm({ worldId, character, onSave, onCancel }: Characte
 
                         {/* Basic Info Column */}
                         <div className="flex-1 space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <div className="space-y-2">
                                     <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Full Name *</Label>
                                     <Input
@@ -161,6 +168,22 @@ export function CharacterForm({ worldId, character, onSave, onCancel }: Characte
                                             <SelectItem value="Supporting">Supporting</SelectItem>
                                             <SelectItem value="Minor">Minor</SelectItem>
                                             <SelectItem value="Mystery">Mystery/Unassigned</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Associated Story</Label>
+                                    <Select value={selectedStoryId} onValueChange={setSelectedStoryId}>
+                                        <SelectTrigger className="h-11 bg-card/50">
+                                            <SelectValue placeholder="Global (World-wide)" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">Global (World-wide)</SelectItem>
+                                            {stories.map((s: any) => (
+                                                <SelectItem key={s.id} value={s.id}>
+                                                    {s.title}
+                                                </SelectItem>
+                                            ))}
                                         </SelectContent>
                                     </Select>
                                 </div>
