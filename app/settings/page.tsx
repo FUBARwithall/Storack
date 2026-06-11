@@ -59,7 +59,7 @@ export default async function SettingsPage() {
                                 size: f.size,
                                 createdAt: f.createdAt.toISOString()
                             }))}
-                            checkoutUrl={`https://storack.lemonsqueezy.com/buy/${process.env.LEMON_SQUEEZY_VARIANT_ID}?checkout[custom][userId]=${user.id}`}
+                            checkoutUrl={`https://storack.lemonsqueezy.com/checkout/buy/${process.env.LEMON_SQUEEZY_VARIANT_ID}?checkout[custom][userId]=${user.id}`}
                         />
                     ) : (
                         <p className="text-muted-foreground text-sm">Not signed in.</p>

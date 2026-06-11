@@ -1,4 +1,3 @@
-```md
 # Story Tracker Platform – Development To-Do List
 
 This document tracks planned features and implementation tasks for the Story Tracker platform.
@@ -8,14 +7,14 @@ This document tracks planned features and implementation tasks for the Story Tra
 ## Phase 1 – MVP (Core System)
 
 ### Authentication
-- [ ] User registration (email/password)
-- [ ] Login system
-- [ ] Session handling (JWT / cookies)
-- [ ] User profile (avatar, bio, goals)
+- [x] User registration (email/password)
+- [x] Login system
+- [x] Session handling (JWT / cookies)
+- [x] User profile (avatar, username, password updates)
 
 ### Story / Project Management
 - [x] Create story project
-- [ ] Edit story metadata (title, genre, synopsis, status)
+- [x] Edit story metadata (title, genre, synopsis, status)
 - [x] Word count goal per story
 - [x] Tags and folders
 - [x] Story list dashboard
@@ -29,13 +28,14 @@ This document tracks planned features and implementation tasks for the Story Tra
 
 ### Writing Editor
 - [x] Rich text / Markdown editor (Basic UI)
-- [ ] Autosave
+- [x] Autosave (debounced/timed at 5 minutes)
 - [x] Word count per chapter and story
 - [x] Light/Dark mode writing UI
+- [x] Find & Replace panel (`Ctrl+F` with match highlighting and smooth scroll)
 
 ### Notes & Research Vault
 - [ ] General notes system
-- [ ] Worldbuilding notes
+- [x] Worldbuilding entries (Locations, Factions, Lore, Systems, Objects)
 - [ ] Research links/files storage
 - [ ] Scratchpad page
 
@@ -58,6 +58,8 @@ This document tracks planned features and implementation tasks for the Story Tra
 - [x] Locations database (UI View)
 - [x] Factions database (UI View)
 - [x] Lore entries system (UI View)
+- [x] Custom Calendars (Months, Weekdays, Year Suffix, Leap Years, Hours/Minutes)
+- [x] Timeline Events (Start/End dates, duration, optional chapter link)
 - [ ] Historical timeline entries
 
 ### Plot & Timeline Tracking
@@ -72,7 +74,12 @@ This document tracks planned features and implementation tasks for the Story Tra
 - [ ] Restore previous versions
 
 ### Analytics & Productivity
-- [ ] Daily word count tracking
+- [x] Manuscript Pulse (completion rates & draft depth)
+- [x] Ink on the page (word count tracking observer)
+- [x] Genre shelf analysis
+- [x] Writing rhythm (monthly word count logs)
+- [x] Writing log (recently touched chapters)
+- [ ] Daily word count tracking (streak system)
 - [ ] Writing streak system
 - [ ] Progress charts
 - [ ] Contribution heatmap calendar
@@ -81,6 +88,13 @@ This document tracks planned features and implementation tasks for the Story Tra
 - [ ] Daily/weekly/monthly word goals
 - [ ] Deadlines
 - [ ] To-do/task list per project
+
+### Subscription & Storage Quota
+- [x] Lemon Squeezy subscription integration (Pro tier upgrades)
+- [x] Storage limit enforcement (100MB Free tier vs. 5GB Pro tier)
+- [x] Webhook synchronization route with HMAC-SHA256 signature verification
+- [x] Server-side file upload verification (Cloudinary CDN integration)
+- [x] Settings Billing UI visualizer and file manager (delete files to reclaim storage)
 
 ---
 
@@ -152,33 +166,34 @@ This document tracks planned features and implementation tasks for the Story Tra
 ## Tech Stack Tasks
 
 ### Frontend
-- [ ] Next.js project setup
-- [ ] Tailwind CSS + shadcn/ui setup
-- [ ] Editor integration (TipTap / Quill)
+- [x] Next.js project setup
+- [x] Tailwind CSS + shadcn/ui setup
+- [x] Editor integration (TipTap / Quill)
 
 ### Backend
-- [ ] NestJS project setup
-- [ ] Prisma schema design
-- [ ] PostgreSQL database
+- [x] Next.js Server Actions & Webhooks
+- [x] Prisma schema design
+- [x] PostgreSQL database
 - [ ] REST or GraphQL API
 
 ### Authentication
-- [ ] Integrate better-auth or Auth.js
+- [x] JWT sessions with Jose & Bcrypt
 
 ### Storage
-- [ ] S3-compatible storage (MinIO / Cloudflare R2)
+- [x] Cloudinary CDN Integration with transactional tracking
 
 ---
 
 ## Roadmap
 
 ### Phase 1 (MVP)
-- [ ] Core writing system
+- [x] Core writing system
 - [ ] Basic export
 
 ### Phase 2 (v1)
-- [ ] Character & worldbuilding databases
-- [ ] Analytics & goals
+- [x] Character & worldbuilding databases
+- [x] Analytics & goals
+- [x] Subscription, limits & storage manager
 
 ### Phase 3 (v2)
 - [ ] Collaboration
@@ -190,4 +205,3 @@ This document tracks planned features and implementation tasks for the Story Tra
 ## License
 
 - [ ] Choose license (MIT / Apache / GPL)
-```
