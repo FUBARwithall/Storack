@@ -4,24 +4,42 @@ import { Plus, BookOpen, Clock, Feather, ArrowRight, Zap } from "lucide-react";
 import Link from "next/link";
 import {
   Card,
-  CardContent,
 } from "@/components/ui/card"
 import { getOrCreateDefaultWorld, getStories } from "@/lib/actions";
 import { getSession } from "@/lib/auth";
+
+const inspirationLines = [
+  "Follow the sentence that feels alive today.",
+  "Give one scene a sharper secret.",
+  "Let the quiet character make the loudest choice.",
+  "Write the door before you decide what waits behind it.",
+  "A small detail can carry an entire world.",
+  "Start with the trouble, then give it a name.",
+  "Make the next paragraph earn its place.",
+  "The draft only needs to move forward today.",
+];
+
+function getRandomInspirationLine() {
+  const values = new Uint32Array(1);
+  crypto.getRandomValues(values);
+  return inspirationLines[values[0] % inspirationLines.length];
+}
 
 export default async function Home() {
   const world = await getOrCreateDefaultWorld();
   const stories = await getStories(world.id);
   const session = await getSession();
   const username = session?.user?.username || "Writer";
+  const inspirationLine = getRandomInspirationLine();
+  const renderTime = new Date();
 
   const totalWords = stories.reduce((acc, story) => acc + story.wordCount, 0);
   const activeProjects = stories.filter(s => s.status !== 'Completed').length;
   const lastEdited = stories[0] ?? null;
 
   // Simple relative time helper (server-side)
-  function timeAgo(date: Date | string) {
-    const diff = Date.now() - new Date(date).getTime();
+  function timeAgo(date: Date | string, now: Date) {
+    const diff = now.getTime() - new Date(date).getTime();
     const mins = Math.floor(diff / 60000);
     if (mins < 60) return `${mins}m ago`;
     const hrs = Math.floor(mins / 60);
@@ -33,27 +51,24 @@ export default async function Home() {
     <div className="p-8 space-y-8 max-w-7xl mx-auto">
       {/* Hero Banner */}
       <div className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 via-accent/5 to-transparent px-6 py-5 md:px-8 md:py-6 shadow-sm">
-        <div className="relative z-10 flex flex-col md:flex-row md:items-stretch justify-between gap-6">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-stretch justify-between gap-3 md:gap-6">
 
           {/* Left: greeting + stats */}
-          <div className="space-y-3 flex-1">
-            <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary select-none">
-              Inspiration Vault
-            </span>
+          <div className="space-y-2 md:space-y-3 flex-1">
             <h1 className="text-3xl font-bold font-serif text-foreground mt-1">
               Good morning, {username}.
             </h1>
             <p className="text-sm text-foreground/65 leading-relaxed italic font-body max-w-sm">
-              "A word after a word after a word is power." What adventure will you draft today?
+              {inspirationLine}
             </p>
-            <div className="flex gap-6 pt-1 text-xs font-semibold text-foreground/70 font-body">
+            <div className="flex gap-4 pt-0.5 md:gap-6 md:pt-1 text-xs font-semibold text-foreground/70 font-body">
               <span className="flex items-center gap-1.5">Words Written: <strong className="text-foreground font-serif">{totalWords.toLocaleString()}</strong></span>
               <span className="flex items-center gap-1.5">Active Projects: <strong className="text-foreground font-serif">{activeProjects}</strong></span>
             </div>
           </div>
 
           {/* Right: last edited + quick actions */}
-          <div className="flex flex-col gap-2.5 md:min-w-[220px] md:max-w-[240px] md:border-l md:border-primary/15 md:pl-5 justify-center">
+          <div className="flex flex-col gap-2 md:gap-2.5 md:min-w-[220px] md:max-w-[240px] md:border-l md:border-primary/15 md:pl-5 justify-center">
             {lastEdited ? (
               <div className="space-y-1">
                 <p className="text-[10px] font-bold tracking-widest text-primary/50 uppercase">Last Edited</p>
@@ -65,7 +80,7 @@ export default async function Home() {
                   <div>
                     <p className="text-sm font-semibold text-foreground group-hover:text-primary leading-tight font-serif line-clamp-1">{lastEdited.title}</p>
                     <p className="text-xs text-foreground/45 flex items-center gap-1 mt-0.5">
-                      <Clock className="h-3 w-3" />{timeAgo(lastEdited.updatedAt)}
+                      <Clock className="h-3 w-3" />{timeAgo(lastEdited.updatedAt, renderTime)}
                     </p>
                   </div>
                 </Link>
