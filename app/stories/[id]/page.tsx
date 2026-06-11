@@ -19,6 +19,8 @@ import { prisma } from "@/lib/db";
 import { CharactersClient } from "@/app/characters/CharactersClient";
 import { WorldClient } from "@/app/world/WorldClient";
 import { StorySettings } from "./StorySettings";
+import { ChapterListClient } from "./ChapterListClient";
+import { NotesVaultClient } from "./NotesVaultClient";
 
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
@@ -184,63 +186,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                                     </div>
                                 </div>
 
-                                <div className="space-y-3">
-                                    {story.chapters.length > 0 ? (
-                                        story.chapters.sort((a, b) => a.order - b.order).map((chapter) => (
-                                            <Card key={chapter.id} className="relative group hover:border-primary/50 transition-all duration-300 hover:shadow-md hover:shadow-primary/5 active:scale-[0.99] active:border-primary/50 active:bg-primary/5 bg-card border-border">
-                                                {/* Card overlay → hub */}
-                                                <Link href={`/stories/${story.id}/chapters/${chapter.id}`} className="absolute inset-0 z-0" aria-label={chapter.title} />
-                                                <CardContent className="flex items-center justify-between p-3 sm:p-4">
-                                                    <div className="flex items-center gap-3 min-w-0">
-                                                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-secondary text-xs font-bold text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300">
-                                                            {chapter.order}
-                                                        </div>
-                                                        <div className="min-w-0">
-                                                            <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors font-serif text-sm sm:text-base truncate">
-                                                                {/* Title → editor directly */}
-                                                                <Link href={`/stories/${story.id}/editor/${chapter.id}`} className="relative z-10 hover:underline">
-                                                                    {chapter.title}
-                                                                </Link>
-                                                            </h3>
-                                                            <p className="text-xs text-muted-foreground mt-0.5 font-body truncate">
-                                                                {chapter.wordCount.toLocaleString()} words • {formatRelativeTime(chapter.lastEdited)}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="relative z-10 flex shrink-0 items-center gap-2 sm:gap-4 ml-2">
-                                                        <Badge
-                                                            variant={chapter.status === 'Completed' ? 'default' : 'outline'}
-                                                            className={cn(
-                                                                chapter.status === 'Editing' && "border-primary/50 text-primary bg-primary/5 font-semibold"
-                                                            )}
-                                                        >
-                                                            {chapter.status}
-                                                        </Badge>
-                                                        <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8 active:scale-90 active:bg-muted">
-                                                            <MoreVertical className="h-4 w-4" />
-                                                        </Button>
-                                                    </div>
-                                                </CardContent>
-                                            </Card>
-                                        ))
-                                    ) : (
-                                        <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed py-16 bg-background/50">
-                                            <div className="rounded-full bg-muted p-4 mb-4">
-                                                <FileText className="h-8 w-8 text-muted-foreground" />
-                                            </div>
-                                            <h3 className="text-lg font-semibold text-foreground">Write your first chapter</h3>
-                                            <p className="text-sm text-muted-foreground mt-1 max-w-xs text-center">Every great adventure begins with a single word. Start yours today.</p>
-                                            <div className="mt-8">
-                                                <Link href={`/stories/${id}/editor/new`}>
-                                                    <Button>
-                                                        <Plus className="mr-2 h-4 w-4" /> Create Chapter
-                                                    </Button>
-                                                </Link>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
+                                 <div className="space-y-3">
+                                     <ChapterListClient chapters={story.chapters} storyId={story.id} />
+                                 </div>
                             </section>
                         </div>
                     </TabsContent>
@@ -272,10 +220,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                         </div>
                     </TabsContent>
                     <TabsContent value="notes" className="m-0 p-4 sm:p-8">
-                        <div className="text-center py-20">
-                            <h2 className="text-xl font-semibold">Research & Notes</h2>
-                            <p className="text-muted-foreground mt-2">Notes system coming soon.</p>
-                        </div>
+                        <NotesVaultClient notes={(story as any).notes || []} storyId={story.id} />
                     </TabsContent>
                 </div>
             </Tabs>

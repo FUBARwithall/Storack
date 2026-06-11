@@ -100,17 +100,17 @@ export function WorldEntryForm({ worldId, storyId, stories = [], entry, onSave, 
             </CardHeader>
             <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    <div className="space-y-8">
-                        {/* Image Section */}
-                        <div className="flex justify-center flex-col items-center gap-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                        {/* Left Column: Image Section */}
+                        <div className="lg:col-span-5 flex flex-col gap-2">
+                            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Reference Image</Label>
                             <div
-                                className="aspect-video rounded-2xl p-4 bg-muted/50 border-2 border-dashed border-muted-foreground/30 flex items-center justify-center relative overflow-hidden group cursor-pointer hover:border-primary/50 transition-colors shadow-sm hover:shadow-md"
-                                style={{ width: '100%', maxWidth: 480 }}
+                                className="flex-1 min-h-[220px] rounded-2xl p-4 bg-muted/50 border-2 border-dashed border-muted-foreground/30 flex items-center justify-center relative overflow-hidden group cursor-pointer hover:border-primary/50 transition-all shadow-sm hover:shadow-md h-full"
                                 onClick={() => fileInputRef.current?.click()}
                             >
                                 {imageUrl ? (
                                     <>
-                                        <img src={imageUrl} alt="Preview" className="h-full w-full object-cover" />
+                                        <img src={imageUrl} alt="Preview" className="absolute inset-0 h-full w-full object-cover" />
                                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                             <Upload className="h-10 w-10 text-white drop-shadow-md" />
                                         </div>
@@ -138,9 +138,9 @@ export function WorldEntryForm({ worldId, storyId, stories = [], entry, onSave, 
                             </div>
                         </div>
 
-                        {/* Form Fields */}
-                        <div className="space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {/* Right Column: Form Fields */}
+                        <div className="lg:col-span-7 flex flex-col justify-between gap-6">
+                            <div className="space-y-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="name" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Entry Name</Label>
                                     <Input
@@ -153,65 +153,67 @@ export function WorldEntryForm({ worldId, storyId, stories = [], entry, onSave, 
                                     />
                                 </div>
 
-                                <div className="space-y-2">
-                                    <Label htmlFor="type" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Category</Label>
-                                    <Select value={type} onValueChange={setType}>
-                                        <SelectTrigger id="type" className="h-11 bg-card/50">
-                                            <SelectValue placeholder="Select type" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {CATEGORIES.map((cat) => (
-                                                <SelectItem key={cat.value} value={cat.value}>
-                                                    <div className="flex items-center gap-2">
-                                                        {cat.icon}
-                                                        <span>{cat.value}</span>
-                                                    </div>
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="type" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Category</Label>
+                                        <Select value={type} onValueChange={setType}>
+                                            <SelectTrigger id="type" className="h-11 w-full bg-card/50">
+                                                <SelectValue placeholder="Select type" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {CATEGORIES.map((cat) => (
+                                                    <SelectItem key={cat.value} value={cat.value}>
+                                                        <div className="flex items-center gap-2">
+                                                            {cat.icon}
+                                                            <span>{cat.value}</span>
+                                                        </div>
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="story" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Associated Story</Label>
+                                        <Select value={selectedStoryId} onValueChange={setSelectedStoryId}>
+                                            <SelectTrigger id="story" className="h-11 w-full bg-card/50">
+                                                <SelectValue placeholder="Global (World-wide)" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="none">Global (World-wide)</SelectItem>
+                                                {stories.map((s: any) => (
+                                                    <SelectItem key={s.id} value={s.id}>
+                                                        {s.title}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="story" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Associated Story</Label>
-                                    <Select value={selectedStoryId} onValueChange={setSelectedStoryId}>
-                                        <SelectTrigger id="story" className="h-11 bg-card/50">
-                                            <SelectValue placeholder="Global (World-wide)" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="none">Global (World-wide)</SelectItem>
-                                            {stories.map((s: any) => (
-                                                <SelectItem key={s.id} value={s.id}>
-                                                    {s.title}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                    <Label htmlFor="mapUrl" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Reference URL (Optional)</Label>
+                                    <Input
+                                        id="mapUrl"
+                                        placeholder="https://..."
+                                        value={mapUrl}
+                                        onChange={(e) => setMapUrl(e.target.value)}
+                                        className="h-11 bg-card/50"
+                                    />
                                 </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="description" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Description & Lore</Label>
-                                <Textarea
-                                    id="description"
-                                    placeholder="A brief summary or detailed history..."
-                                    value={description}
-                                    onChange={(e) => setDescription(e.target.value)}
-                                    className="bg-card/50 min-h-[150px] resize-none"
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="mapUrl" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Reference URL (Optional)</Label>
-                                <Input
-                                    id="mapUrl"
-                                    placeholder="https://..."
-                                    value={mapUrl}
-                                    onChange={(e) => setMapUrl(e.target.value)}
-                                    className="h-11 bg-card/50"
-                                />
                             </div>
                         </div>
+                    </div>
+
+                    <div className="space-y-2 pt-2">
+                        <Label htmlFor="description" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Description & Lore</Label>
+                        <Textarea
+                            id="description"
+                            placeholder="A brief summary or detailed history..."
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            className="bg-card/50 min-h-[150px] resize-none"
+                        />
                     </div>
 
                     <div className="flex items-center justify-end gap-3 pt-6 border-t">

@@ -14,9 +14,10 @@ export default function LayoutWrapper({
 }) {
     const pathname = usePathname();
     const isAuthPage = pathname === "/auth";
+    const isExportPage = pathname.endsWith("/export");
 
-    if (isAuthPage) {
-        return <main className="flex-1 w-full h-full">{children}</main>;
+    if (isAuthPage || isExportPage) {
+        return <main className="flex-1 w-full h-full overflow-y-auto bg-gray-100">{children}</main>;
     }
 
     return (

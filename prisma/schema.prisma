@@ -35,8 +35,13 @@ model UploadedFile {
   id        String   @id @default(cuid())
   url       String   @unique
   size      Float
+  fileName  String?
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  noteId    String?
+  note      Note?    @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  
   createdAt DateTime @default(now())
 }
 
@@ -144,6 +149,7 @@ model Story {
   chapters    Chapter[]
   characters  Character[]
   locations   Location[]
+  notes       Note[]
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
@@ -189,4 +195,24 @@ model Location {
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
+}
+
+
+model Note {
+  id            String         @id @default(cuid())
+  title         String
+  content       String?        @db.Text
+  type          String         @default("general") // "general" | "research" | "scratchpad"
+  links         String[]       // Array of URLs
+  fileUrl       String?
+  fileName      String?
+  fileSize      Float?
+  
+  uploadedFiles UploadedFile[]
+  
+  storyId       String
+  story         Story          @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @default(now()) @updatedAt
 }

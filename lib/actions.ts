@@ -314,6 +314,12 @@ export async function getStoryById(id: string) {
         include: {
             chapters: {
                 orderBy: { order: 'asc' }
+            },
+            notes: {
+                include: {
+                    uploadedFiles: true
+                },
+                orderBy: { createdAt: 'desc' }
             }
         }
     });
@@ -1007,4 +1013,219 @@ export async function updateChapterWorldElements(chapterId: string, data: { char
         revalidatePath(`/stories/${chapter.storyId}/chapters/${chapter.id}/cast`);
     }
     return chapter;
+}
+
+// --- Scenes & Reordering ---
+
+
+async function requireOwnedNote(noteId: string) {
+    const userId = await requireUserId();
+    const note = await prisma.note.findFirst({
+        where: {
+            id: noteId,
+            story: {
+                world: { userId }
+            }
+        }
+    });
+    if (!note) throw new Error("Not found");
+    return note;
+}
+
+export async function reorderChapters(storyId: string, orderedIds: string[]) {
+    await requireOwnedStory(storyId);
+    
+    await prisma.$transaction(
+        orderedIds.map((id, index) =>
+            prisma.chapter.update({
+                where: { id },
+                data: { order: index + 1 }
+            })
+        )
+    );
+    revalidatePath(`/stories/${storyId}`);
+    revalidatePath("/");
+}
+
+export async function createNote(storyId: string, title: string, type: string) {
+    await requireOwnedStory(storyId);
+    const note = await prisma.note.create({
+        data: {
+            storyId,
+            title,
+            type,
+            content: "",
+            links: []
+        },
+        include: {
+            uploadedFiles: true
+        }
+    });
+    revalidatePath(`/stories/${storyId}`);
+    return note;
+}
+
+export async function updateNote(id: string, data: Partial<{ title: string, content: string, links: string[], fileUrl: string | null, fileName: string | null, fileSize: number | null }>) {
+    const note = await requireOwnedNote(id);
+    const updated = await prisma.note.update({
+        where: { id },
+        data,
+        include: {
+            uploadedFiles: true
+        }
+    });
+    revalidatePath(`/stories/${note.storyId}`);
+    return updated;
+}
+
+export async function deleteNote(id: string) {
+    const note = await requireOwnedNote(id);
+    const userId = await requireUserId();
+    
+    // Find all files linked to this note
+    const associatedFiles = await prisma.uploadedFile.findMany({
+        where: { noteId: id }
+    });
+    
+    // Also include any legacy single file if present
+    if (note.fileUrl) {
+        const fileRecord = await prisma.uploadedFile.findUnique({
+            where: { url: note.fileUrl }
+        });
+        if (fileRecord && !associatedFiles.some(f => f.id === fileRecord.id)) {
+            associatedFiles.push(fileRecord);
+        }
+    }
+    
+    if (associatedFiles.length > 0) {
+        // Delete each from Cloudinary
+        for (const fileRecord of associatedFiles) {
+            try {
+                const parts = fileRecord.url.split("/storack/");
+                if (parts.length > 1) {
+                    const pathWithExtension = "storack/" + parts[1];
+                    const publicId = pathWithExtension.split(".")[0];
+                    await cloudinary.uploader.destroy(publicId);
+                }
+            } catch (err) {
+                console.error("Cloudinary delete failed:", err);
+            }
+        }
+        
+        // Sum total size to restore
+        const totalSize = associatedFiles.reduce((sum, f) => sum + f.size, 0);
+        
+        // Delete file records and update quota
+        await prisma.$transaction([
+            prisma.uploadedFile.deleteMany({
+                where: { id: { in: associatedFiles.map(f => f.id) } }
+            }),
+            prisma.user.update({
+                where: { id: userId },
+                data: { storageUsedBytes: { decrement: totalSize } }
+            })
+        ]);
+    }
+    
+    await prisma.note.delete({ where: { id } });
+    revalidatePath(`/stories/${note.storyId}`);
+}
+
+export async function uploadResearchFile(storyId: string, noteId: string, formData: FormData) {
+    try {
+        const story = await requireOwnedStory(storyId);
+        const userId = await requireUserId();
+
+        const file = formData.get("file") as File;
+        if (!file) return { error: "No file uploaded" };
+
+        const quotaCheck = await checkQuota(userId, file.size);
+        if (!quotaCheck.allowed) {
+            return { error: quotaCheck.error };
+        }
+
+        const buffer = Buffer.from(await file.arrayBuffer());
+        const base64 = `data:${file.type};base64,${buffer.toString("base64")}`;
+
+        const result = await cloudinary.uploader.upload(base64, {
+            folder: "storack/research",
+            resource_type: "auto"
+        });
+
+        const fileUrl = result.secure_url;
+        const uploadedBytes = result.bytes;
+
+        const note = await prisma.$transaction(async (tx) => {
+            await tx.uploadedFile.create({
+                data: {
+                    url: fileUrl,
+                    size: uploadedBytes,
+                    fileName: file.name,
+                    userId,
+                    noteId
+                }
+            });
+            await tx.user.update({
+                where: { id: userId },
+                data: {
+                    storageUsedBytes: {
+                        increment: uploadedBytes
+                    }
+                }
+            });
+            return await tx.note.findUnique({
+                where: { id: noteId },
+                include: {
+                    uploadedFiles: true
+                }
+            });
+        });
+
+        revalidatePath(`/stories/${storyId}`);
+        return { success: true, note };
+    } catch (error) {
+        console.error("Error in uploadResearchFile:", error);
+        return { error: error instanceof Error ? error.message : "Unknown error during file upload" };
+    }
+}
+
+export async function deleteResearchFile(fileId: string) {
+    try {
+        const userId = await requireUserId();
+        
+        const fileRecord = await prisma.uploadedFile.findUnique({
+            where: { id: fileId },
+            include: { note: true }
+        });
+        if (!fileRecord) throw new Error("File not found");
+        if (fileRecord.userId !== userId) throw new Error("Unauthorized");
+        
+        try {
+            const parts = fileRecord.url.split("/storack/");
+            if (parts.length > 1) {
+                const pathWithExtension = "storack/" + parts[1];
+                const publicId = pathWithExtension.split(".")[0];
+                await cloudinary.uploader.destroy(publicId);
+            }
+        } catch (err) {
+            console.error("Failed to delete image from Cloudinary:", err);
+        }
+        
+        await prisma.$transaction([
+            prisma.uploadedFile.delete({ where: { id: fileId } }),
+            prisma.user.update({
+                where: { id: userId },
+                data: { storageUsedBytes: { decrement: fileRecord.size } }
+            })
+        ]);
+        
+        if (fileRecord.noteId && fileRecord.note) {
+            revalidatePath(`/stories/${fileRecord.note.storyId}`);
+        }
+        
+        return { success: true };
+    } catch (error) {
+        console.error("Error in deleteResearchFile:", error);
+        return { error: error instanceof Error ? error.message : "Unknown error deleting file" };
+    }
 }

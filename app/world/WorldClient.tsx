@@ -229,7 +229,7 @@ export function WorldClient({ initialLocations, initialCharacters, worldId, stor
                                             </span>
                                         )}
                                     </div>
-                                    <p className="mt-1 text-xs text-muted-foreground font-medium truncate sm:whitespace-normal">{item.description}</p>
+                                    <p className="mt-1 text-xs text-muted-foreground font-medium line-clamp-2">{item.description}</p>
                                 </div>
                             </div>
 

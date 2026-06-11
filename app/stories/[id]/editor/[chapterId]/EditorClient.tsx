@@ -71,6 +71,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ExportModal } from "@/components/ExportModal";
 
 interface EditorClientProps {
     story: { id: string; title: string; worldId: string; chapters: any[] };
@@ -91,6 +92,7 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
     const [wordCount, setWordCount] = useState(initialChapter.wordCount);
     const [hasChanges, setHasChanges] = useState(false);
+    const [isExportOpen, setIsExportOpen] = useState(false);
     const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isImageActive, setIsImageActive] = useState(false);
@@ -457,8 +459,7 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuItem>Export as TXT</DropdownMenuItem>
-                            <DropdownMenuItem>Export as PDF</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setIsExportOpen(true)}>Export Manuscript</DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem>Focus Mode</DropdownMenuItem>
                         </DropdownMenuContent>
@@ -766,6 +767,21 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
                     Storack Editor v1.0
                 </div>
             </footer>
+
+            <ExportModal
+                isOpen={isExportOpen}
+                onClose={() => setIsExportOpen(false)}
+                story={{
+                    id: story.id,
+                    title: story.title,
+                    genre: (story as any).genre,
+                    synopsis: (story as any).synopsis,
+                    chapters: story.chapters
+                }}
+                currentChapterId={initialChapter.id === 'new' ? undefined : initialChapter.id}
+                currentChapterTitle={title}
+                editorContent={editor?.getHTML()}
+            />
         </div>
     );
 }

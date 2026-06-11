@@ -91,6 +91,7 @@ export default async function ChapterHubPage({ params }: { params: Promise<{ id:
                     </Card>
                 </div>
 
+
                 {/* Featured Elements Section */}
                 <div className="border-t pt-6">
                     <h2 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">

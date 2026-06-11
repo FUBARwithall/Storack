@@ -105,17 +105,17 @@ export function CharacterForm({ worldId, storyId, stories = [], character, onSav
             </CardHeader>
             <CardContent className="px-0 pt-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <form onSubmit={handleSubmit} className="space-y-8">
-                    <div className="flex flex-col gap-16">
-                        {/* Avatar Column */}
-                        <div className="flex flex-col items-center gap-4 shrink-0 mb-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                        {/* Left Column: Avatar Section */}
+                        <div className="lg:col-span-5 flex flex-col gap-2">
+                            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Avatar Image</Label>
                             <div
-                                className="flex-none aspect-square rounded-3xl p-8 bg-muted/50 border-2 border-dashed border-muted-foreground/30 flex items-center justify-center relative overflow-hidden group cursor-pointer hover:border-primary/50 transition-colors shadow-sm hover:shadow-md"
-                                style={{ width: 256, height: 256 }}
+                                className="flex-1 min-h-[220px] rounded-3xl p-4 bg-muted/50 border-2 border-dashed border-muted-foreground/30 flex items-center justify-center relative overflow-hidden group cursor-pointer hover:border-primary/50 transition-all shadow-sm hover:shadow-md h-full"
                                 onClick={() => fileInputRef.current?.click()}
                             >
                                 {avatarUrl ? (
                                     <>
-                                        <img src={avatarUrl} alt="Preview" className="h-full w-full object-cover" />
+                                        <img src={avatarUrl} alt="Preview" className="absolute inset-0 h-full w-full object-cover" />
                                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                             <Upload className="h-10 w-10 text-white drop-shadow-md" />
                                         </div>
@@ -129,7 +129,7 @@ export function CharacterForm({ worldId, storyId, stories = [], character, onSav
                                     </>
                                 ) : (
                                     <div className="flex flex-col items-center gap-3 text-muted-foreground group-hover:text-primary transition-colors">
-                                        <Upload className="h-12 w-12" />
+                                        <Upload className="h-10 w-10" />
                                         <span className="text-sm font-bold uppercase tracking-wider">Upload Avatar</span>
                                     </div>
                                 )}
@@ -143,23 +143,25 @@ export function CharacterForm({ worldId, storyId, stories = [], character, onSav
                             </div>
                         </div>
 
-                        {/* Basic Info Column */}
-                        <div className="flex-1 space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {/* Right Column: Form Fields */}
+                        <div className="lg:col-span-7 space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="name" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Full Name *</Label>
+                                <Input
+                                    id="name"
+                                    placeholder="e.g. Kaelen Vance"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    required
+                                    className="h-11 bg-card/50"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Full Name *</Label>
-                                    <Input
-                                        placeholder="e.g. Kaelen Vance"
-                                        value={name}
-                                        onChange={(e) => setName(e.target.value)}
-                                        required
-                                        className="h-11 bg-card/50"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Narrative Role</Label>
+                                    <Label htmlFor="role" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Narrative Role</Label>
                                     <Select value={role} onValueChange={setRole}>
-                                        <SelectTrigger className="h-11 bg-card/50">
+                                        <SelectTrigger id="role" className="h-11 w-full bg-card/50">
                                             <SelectValue placeholder="Select a role" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -171,10 +173,11 @@ export function CharacterForm({ worldId, storyId, stories = [], character, onSav
                                         </SelectContent>
                                     </Select>
                                 </div>
+
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Associated Story</Label>
+                                    <Label htmlFor="story" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Associated Story</Label>
                                     <Select value={selectedStoryId} onValueChange={setSelectedStoryId}>
-                                        <SelectTrigger className="h-11 bg-card/50">
+                                        <SelectTrigger id="story" className="h-11 w-full bg-card/50">
                                             <SelectValue placeholder="Global (World-wide)" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -189,22 +192,22 @@ export function CharacterForm({ worldId, storyId, stories = [], character, onSav
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 pt-2 border-t border-muted/30">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2 border-t border-muted/30">
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Age</Label>
-                                    <Input placeholder="e.g. 24" value={age} onChange={(e) => setAge(e.target.value)} className="bg-card/50 h-10" />
+                                    <Label htmlFor="age" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Age</Label>
+                                    <Input id="age" placeholder="e.g. 24" value={age} onChange={(e) => setAge(e.target.value)} className="bg-card/50 h-10" />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Gender</Label>
-                                    <Input placeholder="e.g. Female" value={gender} onChange={(e) => setGender(e.target.value)} className="bg-card/50 h-10" />
+                                    <Label htmlFor="gender" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Gender</Label>
+                                    <Input id="gender" placeholder="e.g. Female" value={gender} onChange={(e) => setGender(e.target.value)} className="bg-card/50 h-10" />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Species</Label>
-                                    <Input placeholder="e.g. Human" value={species} onChange={(e) => setSpecies(e.target.value)} className="bg-card/50 h-10" />
+                                    <Label htmlFor="species" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Species</Label>
+                                    <Input id="species" placeholder="e.g. Human" value={species} onChange={(e) => setSpecies(e.target.value)} className="bg-card/50 h-10" />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Occupation</Label>
-                                    <Input placeholder="e.g. Knight" value={occupation} onChange={(e) => setOccupation(e.target.value)} className="bg-card/50 h-10" />
+                                    <Label htmlFor="occupation" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Occupation</Label>
+                                    <Input id="occupation" placeholder="e.g. Knight" value={occupation} onChange={(e) => setOccupation(e.target.value)} className="bg-card/50 h-10" />
                                 </div>
                             </div>
                         </div>

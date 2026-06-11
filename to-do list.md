@@ -22,9 +22,8 @@ This document tracks planned features and implementation tasks for the Story Tra
 ### Chapters & Scenes
 - [x] Create chapters
 - [x] Edit chapter content
-- [ ] Reorder chapters
-- [ ] Scene support (optional nested structure)
-- [ ] Draft vs final flag
+- [x] Reorder chapters
+- [x] Draft vs final flag
 
 ### Writing Editor
 - [x] Rich text / Markdown editor (Basic UI)
@@ -34,15 +33,15 @@ This document tracks planned features and implementation tasks for the Story Tra
 - [x] Find & Replace panel (`Ctrl+F` with match highlighting and smooth scroll)
 
 ### Notes & Research Vault
-- [ ] General notes system
+- [x] General notes system
 - [x] Worldbuilding entries (Locations, Factions, Lore, Systems, Objects)
-- [ ] Research links/files storage
-- [ ] Scratchpad page
+- [x] Research links/files storage
+- [x] Scratchpad page
 
 ### Export
-- [ ] Export story to Markdown
-- [ ] Export story to PDF
-- [ ] Basic formatting template
+- [x] Export story to Markdown
+- [x] Export story to PDF
+- [x] Basic formatting template
 
 ---
 
@@ -188,7 +187,7 @@ This document tracks planned features and implementation tasks for the Story Tra
 
 ### Phase 1 (MVP)
 - [x] Core writing system
-- [ ] Basic export
+- [x] Basic export
 
 ### Phase 2 (v1)
 - [x] Character & worldbuilding databases
