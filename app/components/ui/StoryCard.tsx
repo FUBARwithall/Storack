@@ -29,7 +29,7 @@ export function StoryCard({ story, className }: StoryCardProps) {
     return (
         <Link href={`/stories/${story.id}`} className="h-full block">
             <Card className={cn("group overflow-hidden hover:shadow-lg hover:shadow-primary/10 hover:border-primary/30 transition-all duration-300 hover:-translate-y-1 border-border bg-card flex flex-col h-full py-0 gap-0", className)}>
-                <div className="relative h-36 w-full bg-gradient-to-br from-primary/30 to-purple-600/10 overflow-hidden border-b border-border">
+                <div className="relative h-44 w-full bg-gradient-to-br from-primary/30 to-purple-600/10 overflow-hidden border-b border-border">
                     {story.coverImage ? (
                         <img src={story.coverImage} alt={story.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
                     ) : (
@@ -57,7 +57,7 @@ export function StoryCard({ story, className }: StoryCardProps) {
                     </h3>
 
                     {story.synopsis && (
-                        <p className="line-clamp-2 text-sm text-muted-foreground leading-normal font-body italic">
+                        <p className="line-clamp-1 text-sm text-muted-foreground leading-normal font-body italic">
                             "{story.synopsis}"
                         </p>
                     )}
