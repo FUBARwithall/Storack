@@ -190,14 +190,14 @@ export function MobileNav({
 
     return (
         <div className="flex h-14 shrink-0 items-center justify-between border-b bg-sidebar px-4 md:hidden">
-            <Link href="/" className="flex items-center font-semibold">
+            <Link href="/" className="flex items-center font-semibold transition-transform active:scale-[0.98]">
                 <PenTool className="mr-2 h-5 w-5 text-primary" />
                 <span className="text-xl font-serif font-bold italic tracking-wide text-foreground">Storack</span>
             </Link>
 
             <Sheet>
                 <SheetTrigger asChild>
-                    <Button variant="ghost" size="icon" aria-label="Open navigation menu">
+                    <Button variant="ghost" size="icon" aria-label="Open navigation menu" className="active:scale-90 active:bg-primary/10">
                         <Menu className="h-5 w-5" />
                     </Button>
                 </SheetTrigger>
@@ -229,7 +229,7 @@ export function MobileNav({
                                         <Link
                                             href={item.href}
                                             className={cn(
-                                                "flex min-h-11 items-center rounded-lg px-3 text-sm font-medium transition-colors",
+                                                "flex min-h-11 items-center rounded-lg px-3 text-sm font-medium transition-all active:scale-[0.98] active:bg-primary/15",
                                                 isActive
                                                     ? "bg-primary/10 text-primary"
                                                     : "text-foreground/70 hover:bg-accent/50 hover:text-foreground"
@@ -253,7 +253,7 @@ export function MobileNav({
                                             <Link
                                                 href={item.href}
                                                 className={cn(
-                                                    "flex min-h-11 items-center rounded-lg px-3 text-sm font-medium transition-colors",
+                                                    "flex min-h-11 items-center rounded-lg px-3 text-sm font-medium transition-all active:scale-[0.98] active:bg-primary/15",
                                                     isActive
                                                         ? "bg-primary/10 text-primary"
                                                         : "text-foreground/70 hover:bg-accent/50 hover:text-foreground"
@@ -271,13 +271,13 @@ export function MobileNav({
                         <div className="mt-6 border-t pt-5">
                             <MobileSectionLabel>Appearance</MobileSectionLabel>
                             <div className="grid grid-cols-3 gap-2">
-                                <Button variant="outline" size="sm" onClick={() => setTheme("light")} className="justify-center">
+                                <Button variant="outline" size="sm" onClick={() => setTheme("light")} className="justify-center active:scale-[0.96] active:bg-primary/10">
                                     <Sun className="mr-2 h-4 w-4" /> Light
                                 </Button>
-                                <Button variant="outline" size="sm" onClick={() => setTheme("dark")} className="justify-center">
+                                <Button variant="outline" size="sm" onClick={() => setTheme("dark")} className="justify-center active:scale-[0.96] active:bg-primary/10">
                                     <Moon className="mr-2 h-4 w-4" /> Dark
                                 </Button>
-                                <Button variant="outline" size="sm" onClick={() => setTheme("system")} className="justify-center">
+                                <Button variant="outline" size="sm" onClick={() => setTheme("system")} className="justify-center active:scale-[0.96] active:bg-primary/10">
                                     <Laptop className="mr-2 h-4 w-4" /> Auto
                                 </Button>
                             </div>
@@ -287,7 +287,7 @@ export function MobileNav({
                     <div className="border-t p-4">
                         <Button
                             variant="ghost"
-                            className="min-h-11 w-full justify-start text-destructive hover:text-destructive"
+                            className="min-h-11 w-full justify-start text-destructive hover:text-destructive active:scale-[0.98] active:bg-destructive/10"
                             onClick={async () => {
                                 const { logoutAction } = await import("@/lib/auth-actions");
                                 await logoutAction();

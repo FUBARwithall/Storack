@@ -57,7 +57,8 @@ import {
     Search,
     ChevronUp,
     ChevronDown,
-    X
+    X,
+    type LucideIcon
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createChapter, updateChapter, deleteChapter, uploadEditorImage } from "@/lib/actions";
@@ -742,8 +743,8 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
                 className="flex-1 overflow-y-auto bg-background selection:bg-primary/20 flex flex-col"
                 onClick={() => editor.commands.focus()}
             >
-                <div className="w-full py-16 flex-1 flex flex-col bg-background">
-                    <div className="max-w-3xl mx-auto w-full">
+                <div className="w-full py-8 sm:py-16 flex-1 flex flex-col bg-background">
+                    <div className="max-w-3xl mx-auto w-full px-5 sm:px-8 md:px-0">
                         <EditorContent editor={editor} className="flex-1" />
                     </div>
                 </div>
@@ -769,7 +770,7 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
     );
 }
 
-function ToolbarButton({ icon: Icon, label, onClick, active }: { icon: any, label: string, onClick?: () => void, active?: boolean }) {
+function ToolbarButton({ icon: Icon, label, onClick, active }: { icon: LucideIcon, label: string, onClick?: () => void, active?: boolean }) {
     return (
         <Button
             variant="ghost"
@@ -780,7 +781,7 @@ function ToolbarButton({ icon: Icon, label, onClick, active }: { icon: any, labe
                 onClick?.();
             }}
             className={cn(
-                "h-8 w-8 rounded-md transition-colors",
+                "h-8 w-8 rounded-md transition-all active:scale-90 active:bg-primary/10",
                 active ? "bg-muted text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"
             )}
         >
