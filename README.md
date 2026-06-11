@@ -14,6 +14,8 @@
 - **Characters** — Track character profiles (role, age, gender, species, occupation, personality, backstory, avatar).
 - **World Builder** — All content (Locations, Factions, Lore, Systems, Objects) lives inside a *World*, giving you a single namespace to keep stories, lore, and world data together.
 - **Authentication** — Simple username/password auth with JWT sessions (via `jose` + `bcryptjs`).
+- **Notes & Research Vault** — Create and manage general, research, or scratchpad notes. Link web references, upload documents, and organize resources directly within your projects.
+- **Manuscript Exporting** — Export your stories to Markdown, PDF, or document formats with standard styling/formatting template choices.
 - **Subscription & Storage Quotas** — Lemon Squeezy integration with Tiered limits (100MB Free vs 5GB Pro plan). All image uploads (cover, character avatars, world location maps/images, editor files) are verified server-side.
 - **Secure Webhooks** — An endpoint at `/api/lemon/webhook` with crypto-based HMAC signature verification to automatically process subscription creation, renewals, and cancellations.
 - **Media & Storage Manager** — Manage all uploaded files directly from your settings. Reclaim storage space instantly by deleting unwanted assets from Cloudinary.
@@ -79,7 +81,8 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ```
 User ── World ── Story   ── Chapter ── TimelineEvent
-        │        └── Calendar ── TimelineEvent
+        │        ├── Calendar ── TimelineEvent
+        │        └── Note (Research & Scratchpad with Uploads)
         ├── Character (scoped to World)
         └── Location/Entry (scoped to World; type handles Faction, Lore, System, Object)
 ```
