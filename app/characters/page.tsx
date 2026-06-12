@@ -6,7 +6,54 @@ export default async function CharactersPage() {
     const world = await getOrCreateDefaultWorld();
     const characters = await prisma.character.findMany({
         where: { worldId: world.id },
-        include: { story: true },
+        include: {
+            story: true,
+            relationships: {
+                include: {
+                    target: {
+                        select: {
+                            id: true,
+                            name: true,
+                            avatarUrl: true
+                        }
+                    }
+                }
+            },
+            relatedTo: {
+                include: {
+                    character: {
+                        select: {
+                            id: true,
+                            name: true,
+                            avatarUrl: true
+                        }
+                    }
+                }
+            },
+            appearances: {
+                include: {
+                    event: {
+                        include: {
+                            calendar: true
+                        }
+                    },
+                    targetCharacter: {
+                        select: { id: true, name: true, avatarUrl: true }
+                    }
+                }
+            },
+            snapshots: {
+                include: {
+                    event: {
+                        include: {
+                            calendar: true
+                        }
+                    },
+                    chapter: true
+                },
+                orderBy: { createdAt: 'asc' }
+            }
+        },
         orderBy: { name: 'asc' }
     });
 
@@ -15,11 +62,27 @@ export default async function CharactersPage() {
         orderBy: { title: 'asc' }
     });
 
+    const events = await prisma.timelineEvent.findMany({
+        where: { worldId: world.id },
+        include: {
+            calendar: true
+        },
+        orderBy: { title: 'asc' }
+    });
+
+    const chapters = await prisma.chapter.findMany({
+        where: { worldId: world.id },
+        orderBy: { order: 'asc' }
+    });
+
     return (
         <CharactersClient
-            initialCharacters={characters}
+            initialCharacters={characters as any}
             worldId={world.id}
             stories={stories}
+            events={events as any}
+            chapters={chapters}
         />
     );
 }
+

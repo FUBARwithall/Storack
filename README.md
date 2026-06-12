@@ -11,7 +11,7 @@
 - **Autosave** — Changes are automatically saved every 5 minutes with a live status indicator in the header.
 - **Custom Calendars** — Define fully custom calendars (months, weekdays, year suffix, leap rules, hours per day) for your fictional world.
 - **Timeline Events** — Plot events on a world timeline linked to your custom calendar, with optional chapter associations.
-- **Characters** — Track character profiles (role, age, gender, species, occupation, personality, backstory, avatar).
+- **Characters & Versioning** — Track profiles (role, age, gender, species, occupation, personality, backstory, avatar) and narrative state changes using event/chapter-anchored **Character Snapshots** (State History).
 - **World Builder** — All content (Locations, Factions, Lore, Systems, Objects) lives inside a *World*, giving you a single namespace to keep stories, lore, and world data together.
 - **Authentication** — Simple username/password auth with JWT sessions (via `jose` + `bcryptjs`).
 - **Notes & Research Vault** — Create and manage general, research, or scratchpad notes. Link web references, upload documents, and organize resources directly within your projects.

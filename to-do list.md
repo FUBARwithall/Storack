@@ -49,9 +49,9 @@ This document tracks planned features and implementation tasks for the Story Tra
 
 ### Character Database
 - [x] Character profile CRUD (UI View)
-- [ ] Relationship mapping between characters
-- [ ] Track chapter appearances
-- [ ] Custom character fields
+- [x] Relationship mapping between characters (e.g: brother of, enemy of, etc.)
+- [x] Track character appearances in timeline (e.g: born in, died in, etc.)
+- [x] Character Snapshots / State History (narrative version control with event & chapter anchors)
 
 ### Worldbuilding Database
 - [x] Locations database (UI View)
@@ -59,6 +59,7 @@ This document tracks planned features and implementation tasks for the Story Tra
 - [x] Lore entries system (UI View)
 - [x] Custom Calendars (Months, Weekdays, Year Suffix, Leap Years, Hours/Minutes)
 - [x] Timeline Events (Start/End dates, duration, optional chapter link)
+- [ ] Vertical and horizontal relations between characters, locations, factions, lore and events
 - [ ] Historical timeline entries
 
 ### Plot & Timeline Tracking
@@ -202,5 +203,4 @@ This document tracks planned features and implementation tasks for the Story Tra
 ---
 
 ## License
-
-- [ ] Choose license (MIT / Apache / GPL)
+- [x] Choose license (GNU Affero General Public License v3.0 (AGPL-3.0))

@@ -1,19 +1,71 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Search, Plus, User, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Search, Plus, User, MoreHorizontal, Pencil, Trash2, ChevronLeft, Link as LinkIcon, Heart, Calendar as CalendarIcon, Clock, ShieldAlert } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { CharacterForm } from "@/components/characters/CharacterForm";
 import { Input } from "@/components/ui/input";
-import { deleteCharacter } from "@/lib/actions";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+    deleteCharacter,
+    addCharacterRelationship,
+    deleteCharacterRelationship,
+    updateCharacterRelationship,
+    addCharacterAppearance,
+    deleteCharacterAppearance,
+    addCharacterSnapshot,
+    deleteCharacterSnapshot,
+    updateCharacterSnapshot
+} from "@/lib/actions";
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { CalendarEngine, CalendarConfig } from "@/lib/calendar-engine";
+
+// Merges raw Prisma calendar row (config stored as JSON blob) into CalendarConfig
+function toCalendarConfig(cal: any): CalendarConfig {
+    return { ...cal, ...(cal.config ?? {}), id: cal.id, name: cal.name } as CalendarConfig;
+}
+
+function getDisplayState(char: Character) {
+    if (char.snapshots && char.snapshots.length > 0) {
+        const latest = char.snapshots[char.snapshots.length - 1];
+        return {
+            name: latest.name || char.name,
+            role: latest.role !== null ? latest.role : char.role,
+            age: latest.age !== null ? latest.age : char.age,
+            gender: latest.gender !== null ? latest.gender : char.gender,
+            species: latest.species !== null ? latest.species : char.species,
+            occupation: latest.occupation !== null ? latest.occupation : char.occupation,
+            avatarUrl: latest.avatarUrl !== null ? latest.avatarUrl : char.avatarUrl,
+            backstory: latest.backstory !== null ? latest.backstory : char.backstory,
+            personality: latest.personality !== null ? latest.personality : char.personality,
+            isSnapshot: true,
+            snapshotLabel: latest.label
+        };
+    }
+    return {
+        name: char.name,
+        role: char.role,
+        age: char.age,
+        gender: char.gender,
+        species: char.species,
+        occupation: char.occupation,
+        avatarUrl: char.avatarUrl,
+        backstory: char.backstory,
+        personality: char.personality,
+        isSnapshot: false,
+        snapshotLabel: ""
+    };
+}
 
 interface Character {
     id: string;
@@ -29,6 +81,71 @@ interface Character {
     worldId: string;
     storyId?: string | null;
     story?: { id: string, title: string } | null;
+    relationships?: {
+        id: string;
+        type: string;
+        targetId: string;
+        target: {
+            id: string;
+            name: string;
+            avatarUrl: string | null;
+        };
+    }[];
+    relatedTo?: {
+        id: string;
+        type: string;
+        characterId: string;
+        character: {
+            id: string;
+            name: string;
+            avatarUrl: string | null;
+        };
+    }[];
+    appearances?: {
+        id: string;
+        role: string;
+        description: string | null;
+        eventId: string;
+        event: {
+            id: string;
+            title: string;
+            startDate: any;
+            endDate: any;
+            calendar: any;
+        };
+        targetCharacter?: {
+            id: string;
+            name: string;
+            avatarUrl: string | null;
+        } | null;
+    }[];
+    snapshots?: {
+        id: string;
+        label: string;
+        note: string | null;
+        name: string;
+        role: string | null;
+        age: string | null;
+        gender: string | null;
+        species: string | null;
+        occupation: string | null;
+        personality: string | null;
+        backstory: string | null;
+        avatarUrl: string | null;
+        eventId: string | null;
+        event?: {
+            id: string;
+            title: string;
+            startDate: any;
+            calendar: any;
+        } | null;
+        chapterId: string | null;
+        chapter?: {
+            id: string;
+            title: string;
+        } | null;
+        createdAt: string;
+    }[];
 }
 
 interface CharactersClientProps {
@@ -36,20 +153,62 @@ interface CharactersClientProps {
     worldId: string;
     storyId?: string;
     stories?: any[];
+    events?: any[];
+    chapters?: any[];
 }
 
-export function CharactersClient({ initialCharacters, worldId, storyId, stories = [] }: CharactersClientProps) {
+export function CharactersClient({ initialCharacters, worldId, storyId, stories = [], events = [], chapters = [] }: CharactersClientProps) {
     const router = useRouter();
     const [searchTerm, setSearchTerm] = useState("");
-    const [viewMode, setViewMode] = useState<'list' | 'form'>('list');
+    const [viewMode, setViewMode] = useState<'list' | 'form' | 'detail'>('list');
     const [editingCharacter, setEditingCharacter] = useState<Character | undefined>(undefined);
+    const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
+    const [activeTab, setActiveTab] = useState<'overview' | 'relationships' | 'timeline' | 'history'>('overview');
 
-    const filteredCharacters = initialCharacters.filter(char =>
-        char.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        char.role?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        char.occupation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        char.species?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // Modals state
+    const [isRelationModalOpen, setIsRelationModalOpen] = useState(false);
+    const [relationTargetId, setRelationTargetId] = useState("");
+    const [relationType, setRelationType] = useState("Friend of");
+    const [customRelationType, setCustomRelationType] = useState("");
+    const [isRelationSaving, setIsRelationSaving] = useState(false);
+    const [editingRelationshipId, setEditingRelationshipId] = useState<string | null>(null);
+
+    const [isAppearanceModalOpen, setIsAppearanceModalOpen] = useState(false);
+    const [appEventId, setAppEventId] = useState("");
+    const [appRole, setAppRole] = useState("Present at");
+    const [customAppRole, setCustomAppRole] = useState("");
+    const [appDescription, setAppDescription] = useState("");
+    const [appTargetCharId, setAppTargetCharId] = useState("");
+    const [isAppSaving, setIsAppSaving] = useState(false);
+
+    // Snapshot state
+    const [isSnapshotModalOpen, setIsSnapshotModalOpen] = useState(false);
+    const [snapLabel, setSnapLabel] = useState("");
+    const [snapNote, setSnapNote] = useState("");
+    const [snapName, setSnapName] = useState("");
+    const [snapRole, setSnapRole] = useState("");
+    const [snapAge, setSnapAge] = useState("");
+    const [snapGender, setSnapGender] = useState("");
+    const [snapSpecies, setSnapSpecies] = useState("");
+    const [snapOccupation, setSnapOccupation] = useState("");
+    const [snapPersonality, setSnapPersonality] = useState("");
+    const [snapBackstory, setSnapBackstory] = useState("");
+    const [snapAvatarUrl, setSnapAvatarUrl] = useState("");
+    const [snapEventId, setSnapEventId] = useState("");
+    const [snapChapterId, setSnapChapterId] = useState("");
+    const [isSnapSaving, setIsSnapSaving] = useState(false);
+    const [editingSnapshotId, setEditingSnapshotId] = useState<string | null>(null);
+
+    const filteredCharacters = initialCharacters.filter(char => {
+        const display = getDisplayState(char);
+        return display.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            display.role?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            display.occupation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            display.species?.toLowerCase().includes(searchTerm.toLowerCase());
+    });
+
+    // Track current character from updated props
+    const activeChar = initialCharacters.find(c => c.id === selectedCharacterId) || editingCharacter;
 
     const handleCreate = () => {
         setEditingCharacter(undefined);
@@ -61,10 +220,213 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
         setViewMode('form');
     };
 
+    const handleViewDetail = (char: Character) => {
+        setSelectedCharacterId(char.id);
+        setActiveTab('overview');
+        setViewMode('detail');
+    };
+
     const handleDelete = async (id: string) => {
         if (confirm("Are you sure you want to delete this character?")) {
             await deleteCharacter(id);
+            if (selectedCharacterId === id) {
+                setViewMode('list');
+                setSelectedCharacterId(null);
+            }
             router.refresh();
+        }
+    };
+
+    // Relationship Actions
+    const handleSaveRelationship = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!activeChar) return;
+
+        setIsRelationSaving(true);
+        const finalType = relationType === "custom" ? customRelationType : relationType;
+
+        try {
+            if (editingRelationshipId) {
+                await updateCharacterRelationship(worldId, editingRelationshipId, finalType || "Related");
+            } else {
+                if (!relationTargetId) return;
+                await addCharacterRelationship(worldId, {
+                    characterId: activeChar.id,
+                    targetId: relationTargetId,
+                    type: finalType || "Related"
+                });
+            }
+            setIsRelationModalOpen(false);
+            setRelationTargetId("");
+            setCustomRelationType("");
+            setEditingRelationshipId(null);
+            router.refresh();
+        } catch (err) {
+            console.error("Failed to save relationship:", err);
+        } finally {
+            setIsRelationSaving(false);
+        }
+    };
+
+    const handleStartEditRelationship = (relId: string, targetId: string, currentType: string) => {
+        setEditingRelationshipId(relId);
+        setRelationTargetId(targetId);
+        
+        const standardTypes = ["Parent of", "Child of", "Sibling of", "Spouse of", "Friend of", "Rival of", "Enemy of", "Mentor of", "Apprentice of"];
+        if (standardTypes.includes(currentType)) {
+            setRelationType(currentType);
+            setCustomRelationType("");
+        } else {
+            setRelationType("custom");
+            setCustomRelationType(currentType);
+        }
+        setIsRelationModalOpen(true);
+    };
+
+    const handleDeleteRelationship = async (relId: string) => {
+        if (confirm("Delete this relationship?")) {
+            try {
+                await deleteCharacterRelationship(worldId, relId);
+                router.refresh();
+            } catch (err) {
+                console.error("Failed to delete relationship:", err);
+            }
+        }
+    };
+
+    // Appearance Actions
+    const handleAddAppearance = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!activeChar || !appEventId) return;
+
+        setIsAppSaving(true);
+        const finalRole = appRole === "custom" ? customAppRole : appRole;
+
+        try {
+            await addCharacterAppearance(worldId, {
+                characterId: activeChar.id,
+                eventId: appEventId,
+                role: finalRole || "Present",
+                description: appDescription || undefined,
+                targetCharacterId: appTargetCharId || undefined
+            });
+            setIsAppearanceModalOpen(false);
+            setAppEventId("");
+            setCustomAppRole("");
+            setAppDescription("");
+            setAppTargetCharId("");
+            router.refresh();
+        } catch (err) {
+            console.error("Failed to link timeline event:", err);
+        } finally {
+            setIsAppSaving(false);
+        }
+    };
+
+    const handleDeleteAppearance = async (appId: string) => {
+        if (confirm("Unlink this character from this timeline event?")) {
+            try {
+                await deleteCharacterAppearance(worldId, appId);
+                router.refresh();
+            } catch (err) {
+                console.error("Failed to unlink event:", err);
+            }
+        }
+    };
+
+    const handleOpenSnapshotModal = (snapshot?: any) => {
+        if (!activeChar) return;
+        if (snapshot) {
+            setEditingSnapshotId(snapshot.id);
+            setSnapLabel(snapshot.label || "");
+            setSnapNote(snapshot.note || "");
+            setSnapName(snapshot.name || "");
+            setSnapRole(snapshot.role || "");
+            setSnapAge(snapshot.age || "");
+            setSnapGender(snapshot.gender || "");
+            setSnapSpecies(snapshot.species || "");
+            setSnapOccupation(snapshot.occupation || "");
+            setSnapPersonality(snapshot.personality || "");
+            setSnapBackstory(snapshot.backstory || "");
+            setSnapAvatarUrl(snapshot.avatarUrl || "");
+            setSnapEventId(snapshot.eventId || "none");
+            setSnapChapterId(snapshot.chapterId || "none");
+        } else {
+            setEditingSnapshotId(null);
+            setSnapLabel("");
+            setSnapNote("");
+            setSnapName(activeChar.name || "");
+            setSnapRole(activeChar.role || "");
+            setSnapAge(activeChar.age || "");
+            setSnapGender(activeChar.gender || "");
+            setSnapSpecies(activeChar.species || "");
+            setSnapOccupation(activeChar.occupation || "");
+            setSnapPersonality(activeChar.personality || "");
+            setSnapBackstory(activeChar.backstory || "");
+            setSnapAvatarUrl(activeChar.avatarUrl || "");
+            setSnapEventId("");
+            setSnapChapterId("");
+        }
+        setIsSnapshotModalOpen(true);
+    };
+
+    const handleAddSnapshot = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!activeChar || !snapLabel) return;
+        setIsSnapSaving(true);
+        try {
+            if (editingSnapshotId) {
+                await updateCharacterSnapshot(worldId, editingSnapshotId, {
+                    label: snapLabel,
+                    note: snapNote || undefined,
+                    name: snapName,
+                    role: snapRole || null,
+                    age: snapAge || null,
+                    gender: snapGender || null,
+                    species: snapSpecies || null,
+                    occupation: snapOccupation || null,
+                    personality: snapPersonality || null,
+                    backstory: snapBackstory || null,
+                    avatarUrl: snapAvatarUrl || null,
+                    eventId: snapEventId || null,
+                    chapterId: snapChapterId || null,
+                });
+            } else {
+                await addCharacterSnapshot(worldId, {
+                    characterId: activeChar.id,
+                    label: snapLabel,
+                    note: snapNote || undefined,
+                    name: snapName,
+                    role: snapRole || null,
+                    age: snapAge || null,
+                    gender: snapGender || null,
+                    species: snapSpecies || null,
+                    occupation: snapOccupation || null,
+                    personality: snapPersonality || null,
+                    backstory: snapBackstory || null,
+                    avatarUrl: snapAvatarUrl || null,
+                    eventId: snapEventId || null,
+                    chapterId: snapChapterId || null,
+                });
+            }
+            setIsSnapshotModalOpen(false);
+            setEditingSnapshotId(null);
+            router.refresh();
+        } catch (err) {
+            console.error("Failed to save snapshot:", err);
+        } finally {
+            setIsSnapSaving(false);
+        }
+    };
+
+    const handleDeleteSnapshot = async (snapId: string) => {
+        if (confirm("Delete this snapshot? This historical record will be lost.")) {
+            try {
+                await deleteCharacterSnapshot(worldId, snapId);
+                router.refresh();
+            } catch (err) {
+                console.error("Failed to delete snapshot:", err);
+            }
         }
     };
 
@@ -80,8 +442,759 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
                         setViewMode('list');
                         router.refresh();
                     }}
-                    onCancel={() => setViewMode('list')}
+                    onCancel={() => {
+                        setViewMode(selectedCharacterId ? 'detail' : 'list');
+                    }}
                 />
+            </div>
+        );
+    }
+
+    if (viewMode === 'detail' && activeChar) {
+        const display = getDisplayState(activeChar);
+        // Chronologically sort timeline appearances using respective calendar configs
+        const sortedAppearances = [...(activeChar.appearances || [])].sort((a, b) => {
+            if (!a.event.calendar || !b.event.calendar) return 0;
+            const engineA = new CalendarEngine(toCalendarConfig(a.event.calendar));
+            const engineB = new CalendarEngine(toCalendarConfig(b.event.calendar));
+            return engineA.compareDates(a.event.startDate, b.event.startDate);
+        });
+
+        // Filter out existing relationship targets to avoid duplicates in creation dropdown
+        const directRelTargets = activeChar.relationships?.map(r => r.targetId) || [];
+        const relatedToTargets = activeChar.relatedTo?.map(r => r.characterId) || [];
+        const excludedIds = [activeChar.id, ...directRelTargets, ...relatedToTargets];
+        const eligibleCharacters = initialCharacters.filter(c => !excludedIds.includes(c.id));
+
+        // Filter out already linked events
+        const linkedEventIds = activeChar.appearances?.map(a => a.eventId) || [];
+        const eligibleEvents = events.filter(e => !linkedEventIds.includes(e.id));
+
+        return (
+            <div className="p-6 md:p-8 space-y-6 max-w-5xl mx-auto animate-in fade-in duration-500 relative">
+                {/* Header Back Row */}
+                <div>
+                    <Button variant="ghost" onClick={() => setViewMode('list')} className="h-9 px-4 rounded-full bg-secondary/40 hover:bg-secondary">
+                        <ChevronLeft className="mr-1 h-4 w-4" /> Back to List
+                    </Button>
+                </div>
+
+                {/* Master Character Sheet Card */}
+                <Card className="border-none bg-card/40 backdrop-blur-md rounded-none p-6 shadow-none">
+                    <div className="flex flex-col lg:flex-row gap-8 items-start">
+                        {/* Left Column: Sticky Profile Card */}
+                        <div className="shrink-0 w-full lg:w-auto flex justify-center lg:justify-start lg:sticky lg:top-6">
+                            <div className="flex flex-col items-center w-full max-w-xs border border-border bg-card/60 backdrop-blur-md rounded-none shadow-md overflow-hidden">
+                                <div className="w-full aspect-square bg-muted border-b border-border overflow-hidden shrink-0 flex items-center justify-center relative shadow-inner">
+                                    {display.avatarUrl ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={display.avatarUrl} alt={display.name} className="h-full w-full object-cover" />
+                                    ) : (
+                                        <User className="h-16 w-16 text-muted-foreground opacity-30" />
+                                    )}
+                                    {/* Dropdown Action Menu */}
+                                    <div className="absolute top-3 right-3 z-10">
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="secondary" size="icon" className="h-8 w-8 rounded-none bg-background/80 hover:bg-background shadow-sm border border-border backdrop-blur-sm">
+                                                    <MoreHorizontal className="h-4 w-4" />
+                                                    <span className="sr-only">Actions</span>
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="w-36 rounded-none">
+                                                <DropdownMenuItem onClick={() => handleEdit(activeChar)} className="cursor-pointer">
+                                                    <Pencil className="mr-2 h-4 w-4" />
+                                                    Edit
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => handleDelete(activeChar.id)} className="text-destructive focus:text-destructive cursor-pointer">
+                                                    <Trash2 className="mr-2 h-4 w-4" />
+                                                    Delete
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
+                                </div>
+                                
+                                <div className="p-5 space-y-4 w-full flex flex-col items-center text-center">
+                                    <div>
+                                        <h1 className="text-3xl font-extrabold tracking-tight text-foreground leading-none">{display.name}</h1>
+                                        <p className="text-xs font-bold uppercase tracking-widest text-primary mt-2">
+                                            {display.role || "Supporting"}
+                                        </p>
+                                        {display.isSnapshot && (
+                                            <Badge variant="secondary" className="mt-2 text-[10px] py-0.5 px-2 font-semibold bg-primary/10 text-primary hover:bg-primary/20 border-primary/20 rounded-none">
+                                                Active Snapshot: {display.snapshotLabel}
+                                            </Badge>
+                                        )}
+                                        {activeChar.story && (
+                                            <p className="text-xs text-muted-foreground font-medium flex items-center justify-center gap-1 mt-2">
+                                                Linked Story: <span className="text-foreground font-semibold">{activeChar.story.title}</span>
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    {/* Quick Metadata Stats (Centered Key-Value Block) */}
+                                    <div className="w-full flex flex-col gap-2.5 pt-4 border-t border-muted/20">
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-zinc-500 dark:text-zinc-400 font-medium">Age</span>
+                                            <span className="text-foreground font-semibold">{display.age || "—"}</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm border-t border-muted/10 pt-2.5">
+                                            <span className="text-zinc-500 dark:text-zinc-400 font-medium">Gender</span>
+                                            <span className="text-foreground font-semibold">{display.gender || "—"}</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm border-t border-muted/10 pt-2.5">
+                                            <span className="text-zinc-500 dark:text-zinc-400 font-medium">Species</span>
+                                            <span className="text-foreground font-semibold">{display.species || "—"}</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm border-t border-muted/10 pt-2.5">
+                                            <span className="text-zinc-500 dark:text-zinc-400 font-medium">Occupation</span>
+                                            <span className="text-foreground font-semibold">{display.occupation || "—"}</span>
+                                        </div>
+                                    </div>
+
+
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Right Column: Tabs and Details */}
+                        <div className="flex-1 w-full space-y-6">
+                            {/* Tabs Selector */}
+                            <div className="flex border-b border-border gap-2">
+                                {(['overview', 'relationships', 'timeline', 'history'] as const).map((tab) => (
+                                    <button
+                                        key={tab}
+                                        onClick={() => setActiveTab(tab)}
+                                        className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all relative capitalize -mb-[2px] ${activeTab === tab
+                                                ? "border-primary text-primary"
+                                                : "border-transparent text-muted-foreground hover:text-foreground"
+                                            }`}
+                                    >
+                                        {tab === "timeline" ? "Timeline & Life Events" : tab === "history" ? "State History" : tab}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Tab contents */}
+                            <div className="pt-2">
+                                {/* OVERVIEW TAB */}
+                                {activeTab === 'overview' && (
+                                    <div className="space-y-8">
+                                        <div className="space-y-3">
+                                            <h3 className="font-bold text-sm uppercase tracking-wider flex items-center gap-2 text-foreground">
+                                                <User className="h-4 w-4 text-primary" /> Personality & Traits
+                                            </h3>
+                                            <p className="text-sm text-muted-foreground/90 whitespace-pre-wrap leading-relaxed">
+                                                {display.personality || "No personality description added yet."}
+                                            </p>
+                                        </div>
+                                        <div className="space-y-3 border-t border-border/40 pt-6">
+                                            <h3 className="font-bold text-sm uppercase tracking-wider flex items-center gap-2 text-foreground">
+                                                <Clock className="h-4 w-4 text-primary" /> Backstory & Lore
+                                            </h3>
+                                            <p className="text-sm text-muted-foreground/90 whitespace-pre-wrap leading-relaxed">
+                                                {display.backstory || "No backstory information added yet."}
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* RELATIONSHIPS TAB */}
+                                {activeTab === 'relationships' && (
+                                    <div className="space-y-6">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <h3 className="font-bold text-lg text-foreground">Relations List</h3>
+                                                <p className="text-xs text-muted-foreground">Connections to other characters in the universe.</p>
+                                            </div>
+                                            <Button size="sm" onClick={() => setIsRelationModalOpen(true)} className="h-9 px-4">
+                                                <Plus className="mr-1.5 h-4 w-4" /> Add Relationship
+                                            </Button>
+                                        </div>
+
+                                        {((activeChar.relationships?.length || 0) > 0 || (activeChar.relatedTo?.length || 0) > 0) ? (
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                                {/* Direct (Outbound) Relations */}
+                                                {activeChar.relationships?.map((rel) => (
+                                                    <div key={rel.id} className="group relative overflow-hidden bg-card/60 hover:shadow-md transition-all border border-border rounded-none shadow-sm flex h-28">
+                                                        {/* Left: Avatar (1:1 Ratio) */}
+                                                        <div className="aspect-square h-full bg-muted border-r border-border overflow-hidden shrink-0 flex items-center justify-center relative shadow-inner">
+                                                            {rel.target.avatarUrl ? (
+                                                                // eslint-disable-next-line @next/next/no-img-element
+                                                                <img src={rel.target.avatarUrl} alt={rel.target.name} className="h-full w-full object-cover" />
+                                                            ) : (
+                                                                <User className="h-8 w-8 text-muted-foreground/30" />
+                                                            )}
+                                                        </div>
+                                                        {/* Right: Content */}
+                                                        <div className="flex-1 p-4 min-w-0 flex flex-col justify-center">
+                                                            <div className="mb-1">
+                                                                <span className="text-[10px] font-bold text-primary uppercase tracking-widest bg-primary/10 border border-primary/20 px-2.5 py-1 rounded-none inline-flex whitespace-nowrap">
+                                                                    {rel.type}
+                                                                </span>
+                                                            </div>
+                                                            <h4 className="text-base font-bold text-foreground truncate leading-tight pr-8">{rel.target.name}</h4>
+                                                        </div>
+                                                        {/* Top-right dropdown */}
+                                                        <div className="absolute top-2 right-2">
+                                                            <DropdownMenu>
+                                                                <DropdownMenuTrigger asChild>
+                                                                    <Button variant="ghost" size="icon" className="h-7 w-7 rounded-none opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground">
+                                                                        <MoreHorizontal className="h-4 w-4" />
+                                                                    </Button>
+                                                                </DropdownMenuTrigger>
+                                                                <DropdownMenuContent align="end" className="rounded-none w-36">
+                                                                    <DropdownMenuItem onClick={() => handleStartEditRelationship(rel.id, rel.targetId, rel.type)} className="gap-2 cursor-pointer">
+                                                                        <Pencil className="h-3.5 w-3.5" /> Edit relation
+                                                                    </DropdownMenuItem>
+                                                                    <DropdownMenuItem onClick={() => handleDeleteRelationship(rel.id)} className="gap-2 cursor-pointer text-destructive focus:text-destructive">
+                                                                        <Trash2 className="h-3.5 w-3.5" /> Remove
+                                                                    </DropdownMenuItem>
+                                                                </DropdownMenuContent>
+                                                            </DropdownMenu>
+                                                        </div>
+                                                    </div>
+                                                ))}
+
+                                                {/* Inbound Relations */}
+                                                {activeChar.relatedTo?.map((rel) => (
+                                                    <div key={rel.id} className="group relative overflow-hidden bg-card/40 border border-border border-dashed rounded-none shadow-sm flex h-28">
+                                                        {/* Left: Avatar (1:1 Ratio) */}
+                                                        <div className="aspect-square h-full bg-muted border-r border-border overflow-hidden shrink-0 flex items-center justify-center relative shadow-inner">
+                                                            {rel.character.avatarUrl ? (
+                                                                // eslint-disable-next-line @next/next/no-img-element
+                                                                <img src={rel.character.avatarUrl} alt={rel.character.name} className="h-full w-full object-cover" />
+                                                            ) : (
+                                                                <User className="h-8 w-8 text-muted-foreground/30" />
+                                                            )}
+                                                        </div>
+                                                        {/* Right: Content */}
+                                                        <div className="flex-1 p-4 min-w-0 flex flex-col justify-center">
+                                                            <div className="mb-1">
+                                                                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest bg-muted border px-2.5 py-1 rounded-none inline-flex whitespace-nowrap">
+                                                                    {rel.type}
+                                                                </span>
+                                                            </div>
+                                                            <h4 className="text-base font-bold text-foreground truncate leading-tight pr-8">{rel.character.name}</h4>
+                                                        </div>
+                                                        {/* Top-right dropdown */}
+                                                        <div className="absolute top-2 right-2">
+                                                            <DropdownMenu>
+                                                                <DropdownMenuTrigger asChild>
+                                                                    <Button variant="ghost" size="icon" className="h-7 w-7 rounded-none opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground">
+                                                                        <MoreHorizontal className="h-4 w-4" />
+                                                                    </Button>
+                                                                </DropdownMenuTrigger>
+                                                                <DropdownMenuContent align="end" className="rounded-none w-36">
+                                                                    <DropdownMenuItem onClick={() => handleStartEditRelationship(rel.id, rel.characterId, rel.type)} className="gap-2 cursor-pointer">
+                                                                        <Pencil className="h-3.5 w-3.5" /> Edit relation
+                                                                    </DropdownMenuItem>
+                                                                    <DropdownMenuItem onClick={() => handleDeleteRelationship(rel.id)} className="gap-2 cursor-pointer text-destructive focus:text-destructive">
+                                                                        <Trash2 className="h-3.5 w-3.5" /> Remove
+                                                                    </DropdownMenuItem>
+                                                                </DropdownMenuContent>
+                                                            </DropdownMenu>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="text-center py-12 border border-dashed rounded-none bg-muted/5 flex flex-col items-center justify-center">
+                                                <Heart className="h-8 w-8 text-muted-foreground/40 mb-3" />
+                                                <h4 className="font-semibold text-foreground">No relationships logged</h4>
+                                                <p className="text-xs text-muted-foreground mt-1 max-w-xs leading-relaxed">Introduce relations to describe how characters connect inside the chronicle.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* TIMELINE TAB */}
+                                {activeTab === 'timeline' && (
+                                    <div className="space-y-6">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <h3 className="font-bold text-lg text-foreground">Personal Timeline</h3>
+                                                <p className="text-xs text-muted-foreground">Chronicle events this character appeared in.</p>
+                                            </div>
+                                            <Button size="sm" onClick={() => setIsAppearanceModalOpen(true)} className="h-9 px-4">
+                                                <Plus className="mr-1.5 h-4 w-4" /> Link Timeline Event
+                                            </Button>
+                                        </div>
+
+                                        {sortedAppearances.length > 0 ? (
+                                            <div className="relative border-l-2 border-primary/20 ml-4 space-y-6 pb-2">
+                                                {sortedAppearances.map((app) => {
+                                                    const engine = new CalendarEngine(toCalendarConfig(app.event.calendar));
+                                                    return (
+                                                        <div key={app.id} className="relative pl-6 group">
+                                                            {/* Dot */}
+                                                            <div className="absolute -left-[9px] top-1.5 h-4 w-4 rounded-full bg-primary border-4 border-background shadow-sm" />
+
+                                                            <div className="p-4 rounded-xl border border-border bg-card/60 backdrop-blur-sm max-w-2xl relative shadow-sm hover:shadow-md transition-all">
+                                                                {/* Date header */}
+                                                                <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                                                                    <Badge className="bg-primary/10 text-primary hover:bg-primary/20 border-primary/20 font-bold font-mono text-[10px]">
+                                                                        {engine.formatDate(app.event.startDate)}
+                                                                    </Badge>
+                                                                    <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider bg-muted border px-2 py-0.5 rounded-full">
+                                                                        Role: {app.role}
+                                                                    </span>
+                                                                </div>
+
+                                                                <h4 className="font-bold text-sm text-foreground">{app.event.title}</h4>
+
+                                                                {app.description && (
+                                                                    <p className="text-xs text-muted-foreground/90 mt-1 leading-relaxed whitespace-pre-wrap">
+                                                                        {app.description}
+                                                                    </p>
+                                                                )}
+
+                                                                {app.targetCharacter && (
+                                                                    <div className="flex items-center gap-1.5 mt-2">
+                                                                        <span className="text-[10px] text-muted-foreground">involved character</span>
+                                                                        <span className="text-[10px] font-semibold text-foreground bg-muted border px-2 py-0.5 rounded-full">
+                                                                            {app.targetCharacter.name}
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+
+                                                                {/* Unlink Action */}
+                                                                <Button
+                                                                    onClick={() => handleDeleteAppearance(app.id)}
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                >
+                                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <div className="text-center py-12 border border-dashed rounded-2xl bg-muted/5 flex flex-col items-center justify-center">
+                                                <Clock className="h-8 w-8 text-muted-foreground/40 mb-3" />
+                                                <h4 className="font-semibold text-foreground">No chronological appearances</h4>
+                                                <p className="text-xs text-muted-foreground mt-1 max-w-xs leading-relaxed">Link this character to historical timeline events to record their milestones.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* HISTORY TAB */}
+                                {activeTab === 'history' && (
+                                    <div className="space-y-6">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <h3 className="font-bold text-lg text-foreground">State History</h3>
+                                                <p className="text-xs text-muted-foreground">Historical records of how this character changed over time.</p>
+                                            </div>
+                                            <Button size="sm" onClick={handleOpenSnapshotModal} className="h-9 px-4">
+                                                <Plus className="mr-1.5 h-4 w-4" /> Create Snapshot
+                                            </Button>
+                                        </div>
+
+                                        {activeChar.snapshots && activeChar.snapshots.length > 0 ? (
+                                            <div className="relative border-l-2 border-primary/20 ml-4 space-y-6 pb-2">
+                                                {activeChar.snapshots.map((snap) => {
+                                                    return (
+                                                        <div key={snap.id} className="relative pl-6 group">
+                                                            {/* Dot */}
+                                                            <div className="absolute -left-[9px] top-1.5 h-4 w-4 rounded-full bg-primary border-4 border-background shadow-sm" />
+
+                                                             <div className="p-5 rounded-xl border border-border bg-card/60 backdrop-blur-sm max-w-2xl relative shadow-sm hover:shadow-md transition-all space-y-3">
+                                                                <div className="flex flex-wrap items-center gap-2">
+                                                                    <span className="font-bold text-sm text-foreground">{snap.label}</span>
+                                                                    {snap.event && (
+                                                                        <Badge variant="outline" className="text-[10px] py-0">
+                                                                            Event: {snap.event.title}
+                                                                        </Badge>
+                                                                    )}
+                                                                    {snap.chapter && (
+                                                                        <Badge variant="outline" className="text-[10px] py-0">
+                                                                            Chapter: {snap.chapter.title}
+                                                                        </Badge>
+                                                                    )}
+                                                                </div>
+
+                                                                {snap.note && (
+                                                                    <p className="text-xs text-muted-foreground/90 italic bg-muted/30 px-3 py-2 border rounded">
+                                                                        "{snap.note}"
+                                                                    </p>
+                                                                )}
+
+                                                                {/* Card fields snapshot summary */}
+                                                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
+                                                                    <div className="text-[11px] bg-muted/40 p-2 border border-border/50">
+                                                                        <span className="text-muted-foreground block font-medium uppercase tracking-wider text-[9px]">Age</span>
+                                                                        <span className="text-foreground font-semibold">{snap.age || "—"}</span>
+                                                                    </div>
+                                                                    <div className="text-[11px] bg-muted/40 p-2 border border-border/50">
+                                                                        <span className="text-muted-foreground block font-medium uppercase tracking-wider text-[9px]">Occupation</span>
+                                                                        <span className="text-foreground font-semibold truncate block">{snap.occupation || "—"}</span>
+                                                                    </div>
+                                                                    <div className="text-[11px] bg-muted/40 p-2 border border-border/50">
+                                                                        <span className="text-muted-foreground block font-medium uppercase tracking-wider text-[9px]">Species</span>
+                                                                        <span className="text-foreground font-semibold">{snap.species || "—"}</span>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Top-right dropdown */}
+                                                                <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                    <DropdownMenu>
+                                                                        <DropdownMenuTrigger asChild>
+                                                                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-none text-muted-foreground hover:text-foreground">
+                                                                                <MoreHorizontal className="h-4 w-4" />
+                                                                            </Button>
+                                                                        </DropdownMenuTrigger>
+                                                                        <DropdownMenuContent align="end" className="rounded-none w-36">
+                                                                            <DropdownMenuItem onClick={() => handleOpenSnapshotModal(snap)} className="gap-2 cursor-pointer">
+                                                                                <Pencil className="h-3.5 w-3.5" /> Edit snapshot
+                                                                            </DropdownMenuItem>
+                                                                            <DropdownMenuItem onClick={() => handleDeleteSnapshot(snap.id)} className="gap-2 cursor-pointer text-destructive focus:text-destructive">
+                                                                                <Trash2 className="h-3.5 w-3.5" /> Delete
+                                                                            </DropdownMenuItem>
+                                                                        </DropdownMenuContent>
+                                                                    </DropdownMenu>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <div className="text-center py-12 border border-dashed rounded-none bg-muted/5 flex flex-col items-center justify-center">
+                                                <Clock className="h-8 w-8 text-muted-foreground/40 mb-3" />
+                                                <h4 className="font-semibold text-foreground">No historical versions</h4>
+                                                <p className="text-xs text-muted-foreground mt-1 max-w-xs leading-relaxed">Create snapshot milestones to document age transitions, curses, species transformations, or job changes.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </Card>
+
+
+                {/* MODAL: ADD/EDIT RELATIONSHIP */}
+                {isRelationModalOpen && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
+                        <Card className="bg-card border border-border rounded-none w-full max-w-md p-6 space-y-4 shadow-xl relative animate-in zoom-in duration-300">
+                            <div className="flex items-center justify-between border-b pb-2">
+                                <h3 className="font-bold text-lg text-foreground flex items-center gap-2">
+                                    <Heart className="h-5 w-5 text-primary" /> {editingRelationshipId ? "Edit Relationship" : "Add Relationship"}
+                                </h3>
+                                <button onClick={() => { setIsRelationModalOpen(false); setEditingRelationshipId(null); }} className="text-muted-foreground hover:text-foreground text-xl font-bold">&times;</button>
+                            </div>
+                            <form onSubmit={handleSaveRelationship} className="space-y-4 pt-2">
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Target Character *</Label>
+                                    <Select value={relationTargetId} onValueChange={setRelationTargetId} required disabled={!!editingRelationshipId}>
+                                        <SelectTrigger className="bg-card/50 h-10 w-full rounded-none">
+                                            <SelectValue placeholder="Select target character" />
+                                        </SelectTrigger>
+                                        <SelectContent className="rounded-none">
+                                            {editingRelationshipId ? (
+                                                // If editing, show all characters so we can display the correct active name
+                                                initialCharacters.map(c => (
+                                                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                                ))
+                                            ) : eligibleCharacters.length > 0 ? (
+                                                eligibleCharacters.map(c => (
+                                                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                                ))
+                                            ) : (
+                                                <SelectItem value="none" disabled>No eligible characters</SelectItem>
+                                            )}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+ 
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Relationship Type *</Label>
+                                    <Select value={relationType} onValueChange={setRelationType}>
+                                        <SelectTrigger className="bg-card/50 h-10 w-full rounded-none">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent className="rounded-none">
+                                            <SelectItem value="Parent of">Parent of</SelectItem>
+                                            <SelectItem value="Child of">Child of</SelectItem>
+                                            <SelectItem value="Sibling of">Sibling of</SelectItem>
+                                            <SelectItem value="Spouse of">Spouse of</SelectItem>
+                                            <SelectItem value="Friend of">Friend of</SelectItem>
+                                            <SelectItem value="Rival of">Rival of</SelectItem>
+                                            <SelectItem value="Enemy of">Enemy of</SelectItem>
+                                            <SelectItem value="Mentor of">Mentor of</SelectItem>
+                                            <SelectItem value="Apprentice of">Apprentice of</SelectItem>
+                                            <SelectItem value="custom">Custom Type...</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+ 
+                                {relationType === "custom" && (
+                                    <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
+                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Custom Relationship Type *</Label>
+                                        <Input
+                                            placeholder="e.g. Secret Admirer, Arch-nemesis"
+                                            value={customRelationType}
+                                            onChange={(e) => setCustomRelationType(e.target.value)}
+                                            required
+                                            className="h-10 bg-card/50 rounded-none"
+                                        />
+                                    </div>
+                                )}
+ 
+                                <div className="flex justify-end gap-3 pt-4 border-t">
+                                    <Button type="button" variant="outline" size="sm" onClick={() => { setIsRelationModalOpen(false); setEditingRelationshipId(null); }} disabled={isRelationSaving} className="rounded-none">
+                                        Cancel
+                                    </Button>
+                                    <Button type="submit" size="sm" disabled={isRelationSaving || !relationTargetId || (relationType === "custom" && !customRelationType)} className="rounded-none">
+                                        {isRelationSaving ? "Saving..." : (editingRelationshipId ? "Save Changes" : "Add Relation")}
+                                    </Button>
+                                </div>
+                            </form>
+                        </Card>
+                    </div>
+                )}
+
+                {/* MODAL: LINK TIMELINE EVENT */}
+                {isAppearanceModalOpen && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
+                        <Card className="bg-card border border-border rounded-2xl w-full max-w-md p-6 space-y-4 shadow-xl relative animate-in zoom-in duration-300">
+                            <div className="flex items-center justify-between border-b pb-2">
+                                <h3 className="font-bold text-lg text-foreground flex items-center gap-2">
+                                    <CalendarIcon className="h-5 w-5 text-primary" /> Link Timeline Event
+                                </h3>
+                                <button onClick={() => setIsAppearanceModalOpen(false)} className="text-muted-foreground hover:text-foreground text-xl font-bold">&times;</button>
+                            </div>
+                            <form onSubmit={handleAddAppearance} className="space-y-4 pt-2">
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Timeline Event *</Label>
+                                    <Select value={appEventId} onValueChange={setAppEventId} required>
+                                        <SelectTrigger className="bg-card/50 h-10 w-full">
+                                            <SelectValue placeholder="Select timeline event" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {eligibleEvents.length > 0 ? (
+                                                eligibleEvents.map(e => {
+                                                    const engine = new CalendarEngine(toCalendarConfig(e.calendar));
+                                                    return (
+                                                        <SelectItem key={e.id} value={e.id}>
+                                                            {e.title} ({engine.formatDate(e.startDate)})
+                                                        </SelectItem>
+                                                    );
+                                                })
+                                            ) : (
+                                                <SelectItem value="none" disabled>No eligible events found</SelectItem>
+                                            )}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Character's Role *</Label>
+                                    <Select value={appRole} onValueChange={setAppRole}>
+                                        <SelectTrigger className="bg-card/50 h-10 w-full">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Born">Born</SelectItem>
+                                            <SelectItem value="Died">Died</SelectItem>
+                                            <SelectItem value="Fought">Fought</SelectItem>
+                                            <SelectItem value="Met">Met</SelectItem>
+                                            <SelectItem value="Present">Present</SelectItem>
+                                            <SelectItem value="custom">Custom Role...</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                {appRole === "custom" && (
+                                    <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
+                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Custom Role *</Label>
+                                        <Input
+                                            placeholder="e.g. Escaped, Initiated"
+                                            value={customAppRole}
+                                            onChange={(e) => setCustomAppRole(e.target.value)}
+                                            required
+                                            className="h-10 bg-card/50"
+                                        />
+                                    </div>
+                                )}
+
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Involved Character (Optional)</Label>
+                                    <Select value={appTargetCharId} onValueChange={setAppTargetCharId}>
+                                        <SelectTrigger className="bg-card/50 h-10 w-full">
+                                            <SelectValue placeholder="None" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">None</SelectItem>
+                                            {initialCharacters
+                                                .filter(c => c.id !== activeChar?.id)
+                                                .map(c => (
+                                                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                                ))
+                                            }
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Appearance Description (Optional)</Label>
+                                    <Textarea
+                                        placeholder="Add extra context on their participation or context..."
+                                        value={appDescription}
+                                        onChange={(e) => setAppDescription(e.target.value)}
+                                        className="bg-card/50 min-h-[80px] resize-none"
+                                    />
+                                </div>
+
+                                <div className="flex justify-end gap-3 pt-4 border-t">
+                                    <Button type="button" variant="outline" size="sm" onClick={() => setIsAppearanceModalOpen(false)} disabled={isAppSaving}>
+                                        Cancel
+                                    </Button>
+                                    <Button type="submit" size="sm" disabled={isAppSaving || !appEventId || (appRole === "custom" && !customAppRole)}>
+                                        {isAppSaving ? "Saving..." : "Link Event"}
+                                    </Button>
+                                </div>
+                            </form>
+                        </Card>
+                    </div>
+                )}
+
+                {/* MODAL: CREATE SNAPSHOT */}
+                {isSnapshotModalOpen && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
+                        <Card className="w-full max-w-xl bg-card border border-border rounded-none shadow-lg max-h-[90vh] overflow-y-auto relative animate-in zoom-in duration-300 p-6 space-y-4">
+                            <div className="flex items-center justify-between border-b pb-2">
+                                <h3 className="font-bold text-lg text-foreground flex items-center gap-2">
+                                    <Clock className="h-5 w-5 text-primary" /> {editingSnapshotId ? "Edit Snapshot" : "Create Snapshot"}
+                                </h3>
+                                <button onClick={() => setIsSnapshotModalOpen(false)} className="text-muted-foreground hover:text-foreground text-xl font-bold">&times;</button>
+                            </div>
+                            
+                            <form onSubmit={handleAddSnapshot} className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2 col-span-2">
+                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Snapshot Label *</Label>
+                                        <Input
+                                            placeholder="e.g. After Timeskip, Post-Curse"
+                                            value={snapLabel}
+                                            onChange={(e) => setSnapLabel(e.target.value)}
+                                            required
+                                            className="h-10 bg-card/50"
+                                        />
+                                    </div>
+                                    <div className="space-y-2 col-span-2">
+                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Change Notes (Optional)</Label>
+                                        <Textarea
+                                            placeholder="Describe what changed in this version and why..."
+                                            value={snapNote}
+                                            onChange={(e) => setSnapNote(e.target.value)}
+                                            className="bg-card/50 min-h-[60px] resize-none"
+                                        />
+                                    </div>
+                                    
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Anchor to Event (Optional)</Label>
+                                        <Select value={snapEventId} onValueChange={setSnapEventId}>
+                                            <SelectTrigger className="bg-card/50 h-10 w-full">
+                                                <SelectValue placeholder="None" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="none">None</SelectItem>
+                                                {events.map(e => {
+                                                    const engine = new CalendarEngine(toCalendarConfig(e.calendar));
+                                                    return (
+                                                        <SelectItem key={e.id} value={e.id}>
+                                                            {e.title} ({engine.formatDate(e.startDate)})
+                                                        </SelectItem>
+                                                    );
+                                                })}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Anchor to Chapter (Optional)</Label>
+                                        <Select value={snapChapterId} onValueChange={setSnapChapterId}>
+                                            <SelectTrigger className="bg-card/50 h-10 w-full">
+                                                <SelectValue placeholder="None" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="none">None</SelectItem>
+                                                {chapters.map(c => (
+                                                    <SelectItem key={c.id} value={c.id}>
+                                                        {c.title}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    <hr className="col-span-2 my-2 border-muted/50" />
+                                    
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Name</Label>
+                                        <Input value={snapName} onChange={(e) => setSnapName(e.target.value)} required className="h-10 bg-card/50" />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Role</Label>
+                                        <Input value={snapRole} onChange={(e) => setSnapRole(e.target.value)} className="h-10 bg-card/50" />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Age</Label>
+                                        <Input value={snapAge} onChange={(e) => setSnapAge(e.target.value)} className="h-10 bg-card/50" />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Gender</Label>
+                                        <Input value={snapGender} onChange={(e) => setSnapGender(e.target.value)} className="h-10 bg-card/50" />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Species</Label>
+                                        <Input value={snapSpecies} onChange={(e) => setSnapSpecies(e.target.value)} className="h-10 bg-card/50" />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Occupation</Label>
+                                        <Input value={snapOccupation} onChange={(e) => setSnapOccupation(e.target.value)} className="h-10 bg-card/50" />
+                                    </div>
+
+                                    <div className="space-y-2 col-span-2">
+                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Avatar URL</Label>
+                                        <Input value={snapAvatarUrl} onChange={(e) => setSnapAvatarUrl(e.target.value)} placeholder="e.g. image path or external URL" className="h-10 bg-card/50" />
+                                    </div>
+
+                                    <div className="space-y-2 col-span-2">
+                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Personality</Label>
+                                        <Textarea value={snapPersonality} onChange={(e) => setSnapPersonality(e.target.value)} className="bg-card/50 min-h-[60px] resize-none" />
+                                    </div>
+
+                                    <div className="space-y-2 col-span-2">
+                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Backstory</Label>
+                                        <Textarea value={snapBackstory} onChange={(e) => setSnapBackstory(e.target.value)} className="bg-card/50 min-h-[60px] resize-none" />
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-end gap-3 pt-4 border-t">
+                                    <Button type="button" variant="outline" size="sm" onClick={() => setIsSnapshotModalOpen(false)} disabled={isSnapSaving}>
+                                        Cancel
+                                    </Button>
+                                    <Button type="submit" size="sm" disabled={isSnapSaving || !snapLabel || !snapName}>
+                                        {isSnapSaving ? "Saving..." : (editingSnapshotId ? "Save Changes" : "Create Snapshot")}
+                                    </Button>
+                                </div>
+                            </form>
+                        </Card>
+                    </div>
+                )}
             </div>
         );
     }
@@ -114,76 +1227,85 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
 
             {filteredCharacters.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in duration-500">
-                    {filteredCharacters.map((char) => (
-                        <Card key={char.id} className="group overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border border-border bg-card/60 backdrop-blur-sm py-0 gap-0">
-                            <div className="aspect-[4/5] w-full bg-muted flex items-center justify-center relative overflow-hidden">
-                                {char.avatarUrl ? (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img
-                                        src={char.avatarUrl}
-                                        alt={char.name}
-                                        className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-500"
-                                    />
-                                ) : (
-                                    <User className="h-20 w-20 text-muted-foreground opacity-30" />
-                                )}
+                    {filteredCharacters.map((char) => {
+                        const display = getDisplayState(char);
+                        return (
+                            <Card
+                                key={char.id}
+                                onClick={() => handleViewDetail(char)}
+                                className="cursor-pointer group overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border border-border bg-card/60 backdrop-blur-sm py-0 gap-0"
+                            >
+                                <div className="aspect-[4/5] w-full bg-muted flex items-center justify-center relative overflow-hidden">
+                                    {display.avatarUrl ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img
+                                            src={display.avatarUrl}
+                                            alt={display.name}
+                                            className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                        />
+                                    ) : (
+                                        <User className="h-20 w-20 text-muted-foreground opacity-30" />
+                                    )}
 
-                                {char.story && (
-                                    <div className="absolute top-2 left-2 z-10 rounded-full bg-background/80 backdrop-blur-md border border-border px-2.5 py-0.5 text-[10px] font-medium text-foreground shadow-sm">
-                                        {char.story.title}
+                                    {char.story && (
+                                        <div className="absolute top-2 left-2 z-10 rounded-full bg-background/80 backdrop-blur-md border border-border px-2.5 py-0.5 text-[10px] font-medium text-foreground shadow-sm">
+                                            {char.story.title}
+                                        </div>
+                                    )}
+
+                                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10" onClick={(e) => e.stopPropagation()}>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full shadow-lg bg-background/80 backdrop-blur-md border border-white/20">
+                                                    <MoreHorizontal className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="w-40">
+                                                <DropdownMenuItem onSelect={() => handleEdit(char)} className="cursor-pointer">
+                                                    <Pencil className="mr-2 h-4 w-4" /> Edit
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onSelect={() => handleDelete(char.id)} className="text-destructive focus:text-destructive cursor-pointer">
+                                                    <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
                                     </div>
-                                )}
 
-                                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full shadow-lg bg-background/80 backdrop-blur-md border border-white/20">
-                                                <MoreHorizontal className="h-4 w-4 text-foreground" />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" className="w-40">
-                                            <DropdownMenuItem onSelect={() => handleEdit(char)} className="cursor-pointer">
-                                                <Pencil className="mr-2 h-4 w-4" /> Edit
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onSelect={() => handleDelete(char.id)} className="text-destructive focus:text-destructive cursor-pointer">
-                                                <Trash2 className="mr-2 h-4 w-4" /> Delete
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
+                                    {/* Snapshot label pill — bottom-left of image */}
+                                    {display.isSnapshot && (
+                                        <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1 bg-black/60 backdrop-blur-sm border border-white/20 px-2 py-0.5 pointer-events-none transition-opacity duration-300 group-hover:opacity-0">
+                                            <ShieldAlert className="h-2.5 w-2.5 text-primary shrink-0" />
+                                            <span className="text-[9px] font-bold uppercase tracking-wider text-primary truncate max-w-[120px]">{display.snapshotLabel}</span>
+                                        </div>
+                                    )}
+
+                                    {/* Overlay Gradient */}
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-end p-4 flex-col justify-end pointer-events-none">
+                                        <p className="text-white text-[10px] font-semibold uppercase tracking-wider mb-0.5 opacity-80">{display.occupation || display.species || "Unknown"}</p>
+                                        <h3 className="text-white text-lg font-bold truncate">{display.name}</h3>
+                                    </div>
                                 </div>
 
-                                {/* Overlay Gradient */}
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-end p-4 flex-col justify-end pointer-events-none">
-                                    <p className="text-white text-[10px] font-semibold uppercase tracking-wider mb-0.5 opacity-80">{char.occupation || char.species || "Unknown"}</p>
-                                    <h3 className="text-white text-lg font-bold truncate">{char.name}</h3>
-                                </div>
-                            </div>
+                                <CardContent className="p-3 flex flex-col gap-1.5">
+                                    <div className="flex items-baseline justify-between gap-2">
+                                        <h3 className="text-sm font-bold text-foreground leading-tight group-hover:text-primary transition-colors truncate">
+                                            {display.name}
+                                        </h3>
+                                        <span className="text-[10px] font-bold uppercase tracking-widest text-primary opacity-90 shrink-0">
+                                            {display.role || "Character"}
+                                        </span>
+                                    </div>
 
-                            <CardContent className="p-4 flex flex-col gap-2">
-                                <div className="flex items-baseline justify-between gap-2">
-                                    <h3 className="text-base font-bold text-foreground leading-tight group-hover:text-primary transition-colors truncate">
-                                        {char.name}
-                                    </h3>
-                                    <span className="text-[10px] font-bold uppercase tracking-widest text-primary opacity-90 shrink-0">
-                                        {char.role || "Character"}
-                                    </span>
-                                </div>
-
-                                <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                                    <span className="truncate">
-                                        {char.species}{char.species && char.occupation && " • "}{char.occupation}
-                                    </span>
-                                    {char.age && <span className="shrink-0">{char.age} yrs</span>}
-                                </div>
-
-                                {char.backstory && (
-                                    <p className="text-xs text-muted-foreground/75 line-clamp-2 leading-relaxed border-t border-muted/20">
-                                        {char.backstory}
-                                    </p>
-                                )}
-                            </CardContent>
-                        </Card>
-                    ))}
+                                    <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                                        <span className="truncate">
+                                            {display.species}{display.species && display.occupation && " • "}{display.occupation}
+                                        </span>
+                                        {display.age && <span className="shrink-0">{display.age} yrs</span>}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        );
+                    })}
 
                     {/* Add New Card */}
                     <button
@@ -212,7 +1334,6 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
                     </div>
                 </div>
             )}
-
         </div>
     );
 }

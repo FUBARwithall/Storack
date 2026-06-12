@@ -284,6 +284,16 @@ export async function createEvent(calendarId: string, worldId: string, event: { 
     return newEvent;
 }
 
+export async function deleteEvent(eventId: string) {
+    const userId = await requireUserId();
+    const event = await prisma.timelineEvent.findFirst({
+        where: { id: eventId, world: { userId } },
+    });
+    if (!event) throw new Error("Not found");
+    await prisma.timelineEvent.delete({ where: { id: eventId } });
+    revalidatePath("/world");
+}
+
 // --- Stories ---
 export async function getStories(worldId: string) {
     await requireOwnedWorld(worldId);
@@ -684,6 +694,220 @@ export async function deleteCharacter(id: string) {
         revalidatePath(`/stories/${char.storyId}`);
     }
 }
+
+// --- Character Relationships & Appearances ---
+export async function addCharacterRelationship(worldId: string, data: { characterId: string, targetId: string, type: string }) {
+    await requireOwnedWorld(worldId);
+    
+    const [char, target] = await Promise.all([
+        prisma.character.findFirst({ where: { id: data.characterId, worldId } }),
+        prisma.character.findFirst({ where: { id: data.targetId, worldId } })
+    ]);
+    if (!char || !target) throw new Error("Character not found");
+
+    const rel = await prisma.characterRelationship.create({
+        data: {
+            characterId: data.characterId,
+            targetId: data.targetId,
+            type: data.type
+        }
+    });
+
+    revalidatePath("/characters");
+    revalidatePath("/world");
+    return rel;
+}
+
+export async function deleteCharacterRelationship(worldId: string, relationshipId: string) {
+    await requireOwnedWorld(worldId);
+    
+    const rel = await prisma.characterRelationship.findUnique({
+        where: { id: relationshipId },
+        include: { character: true }
+    });
+    if (!rel || rel.character.worldId !== worldId) throw new Error("Relationship not found");
+
+    await prisma.characterRelationship.delete({
+        where: { id: relationshipId }
+    });
+
+    revalidatePath("/characters");
+    revalidatePath("/world");
+}
+
+export async function updateCharacterRelationship(worldId: string, relationshipId: string, type: string) {
+    await requireOwnedWorld(worldId);
+
+    const rel = await prisma.characterRelationship.findUnique({
+        where: { id: relationshipId },
+        include: { character: true }
+    });
+    if (!rel || rel.character.worldId !== worldId) throw new Error("Relationship not found");
+
+    const updated = await prisma.characterRelationship.update({
+        where: { id: relationshipId },
+        data: { type }
+    });
+
+    revalidatePath("/characters");
+    revalidatePath("/world");
+    return updated;
+}
+
+export async function addCharacterAppearance(worldId: string, data: { characterId: string, eventId: string, role: string, description?: string, targetCharacterId?: string }) {
+    await requireOwnedWorld(worldId);
+
+    const [char, event] = await Promise.all([
+        prisma.character.findFirst({ where: { id: data.characterId, worldId } }),
+        prisma.timelineEvent.findFirst({ where: { id: data.eventId, worldId } })
+    ]);
+    if (!char || !event) throw new Error("Character or Event not found");
+
+    if (data.targetCharacterId) {
+        const target = await prisma.character.findFirst({ where: { id: data.targetCharacterId, worldId } });
+        if (!target) throw new Error("Target character not found");
+    }
+
+    const app = await prisma.characterAppearance.create({
+        data: {
+            characterId: data.characterId,
+            eventId: data.eventId,
+            role: data.role,
+            description: data.description,
+            targetCharacterId: data.targetCharacterId || null
+        }
+    });
+
+    revalidatePath("/characters");
+    revalidatePath("/world");
+    return app;
+}
+
+export async function deleteCharacterAppearance(worldId: string, appearanceId: string) {
+    await requireOwnedWorld(worldId);
+
+    const app = await prisma.characterAppearance.findUnique({
+        where: { id: appearanceId },
+        include: { character: true }
+    });
+    if (!app || app.character.worldId !== worldId) throw new Error("Appearance not found");
+
+    await prisma.characterAppearance.delete({
+        where: { id: appearanceId }
+    });
+
+    revalidatePath("/characters");
+    revalidatePath("/world");
+}
+
+export async function addCharacterSnapshot(worldId: string, data: {
+    characterId: string;
+    label: string;
+    note?: string;
+    name: string;
+    role?: string | null;
+    age?: string | null;
+    gender?: string | null;
+    species?: string | null;
+    occupation?: string | null;
+    personality?: string | null;
+    backstory?: string | null;
+    avatarUrl?: string | null;
+    eventId?: string | null;
+    chapterId?: string | null;
+}) {
+    await requireOwnedWorld(worldId);
+
+    const character = await prisma.character.findUnique({
+        where: { id: data.characterId }
+    });
+    if (!character || character.worldId !== worldId) throw new Error("Character not found");
+
+    const snapshot = await prisma.characterSnapshot.create({
+        data: {
+            characterId: data.characterId,
+            label: data.label,
+            note: data.note || null,
+            name: data.name,
+            role: data.role || null,
+            age: data.age || null,
+            gender: data.gender || null,
+            species: data.species || null,
+            occupation: data.occupation || null,
+            personality: data.personality || null,
+            backstory: data.backstory || null,
+            avatarUrl: data.avatarUrl || null,
+            eventId: data.eventId && data.eventId !== "none" ? data.eventId : null,
+            chapterId: data.chapterId && data.chapterId !== "none" ? data.chapterId : null,
+        }
+    });
+
+    revalidatePath("/characters");
+    return snapshot;
+}
+
+export async function deleteCharacterSnapshot(worldId: string, snapshotId: string) {
+    await requireOwnedWorld(worldId);
+
+    const snapshot = await prisma.characterSnapshot.findUnique({
+        where: { id: snapshotId },
+        include: { character: true }
+    });
+    if (!snapshot || snapshot.character.worldId !== worldId) throw new Error("Snapshot not found");
+
+    await prisma.characterSnapshot.delete({
+        where: { id: snapshotId }
+    });
+
+    revalidatePath("/characters");
+}
+
+export async function updateCharacterSnapshot(worldId: string, snapshotId: string, data: {
+    label: string;
+    note?: string;
+    name: string;
+    role?: string | null;
+    age?: string | null;
+    gender?: string | null;
+    species?: string | null;
+    occupation?: string | null;
+    personality?: string | null;
+    backstory?: string | null;
+    avatarUrl?: string | null;
+    eventId?: string | null;
+    chapterId?: string | null;
+}) {
+    await requireOwnedWorld(worldId);
+
+    const snapshot = await prisma.characterSnapshot.findUnique({
+        where: { id: snapshotId },
+        include: { character: true }
+    });
+    if (!snapshot || snapshot.character.worldId !== worldId) throw new Error("Snapshot not found");
+
+    const updated = await prisma.characterSnapshot.update({
+        where: { id: snapshotId },
+        data: {
+            label: data.label,
+            note: data.note || null,
+            name: data.name,
+            role: data.role || null,
+            age: data.age || null,
+            gender: data.gender || null,
+            species: data.species || null,
+            occupation: data.occupation || null,
+            personality: data.personality || null,
+            backstory: data.backstory || null,
+            avatarUrl: data.avatarUrl || null,
+            eventId: data.eventId && data.eventId !== "none" ? data.eventId : null,
+            chapterId: data.chapterId && data.chapterId !== "none" ? data.chapterId : null,
+        }
+    });
+
+    revalidatePath("/characters");
+    return updated;
+}
+
 
 // --- Locations ---
 export async function createLocation(worldId: string, data: { name: string, type?: string, description?: string, mapUrl?: string, imageUrl?: string, storyId?: string | null }) {

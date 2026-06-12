@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CalendarEngine, CustomDate, DEFAULT_CALENDAR, CalendarConfig, MonthConfig, WeekDayConfig, RecurringEvent } from "@/lib/calendar-engine";
 import { Calendar as CalendarIcon, Clock, ChevronLeft, ChevronRight, Plus, Trash, Settings, Save, X, Snowflake, Sun } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
-import { createCalendar, createEvent, getEvents, deleteCalendar, updateChapterDates } from "@/lib/actions";
+import { createCalendar, createEvent, getEvents, deleteCalendar, updateChapterDates, deleteEvent } from "@/lib/actions";
 import { useEffect } from "react";
 
 const FANTASY_CALENDAR: CalendarConfig = {
@@ -274,6 +274,16 @@ export function CalendarWidget({ chapters = [], worldId, initialCalendars = [] }
             setSelectedChapterId('none');
         } catch (e) {
             console.error("Failed to save event", e);
+        }
+    };
+
+    const handleDeleteEvent = async (eventId: string) => {
+        if (!confirm('Remove this event from the chronicle?')) return;
+        try {
+            await deleteEvent(eventId);
+            setEvents(prev => prev.filter(e => e.id !== eventId));
+        } catch (e) {
+            console.error('Failed to delete event', e);
         }
     };
 
@@ -774,15 +784,25 @@ export function CalendarWidget({ chapters = [], worldId, initialCalendars = [] }
                                                             <div className="absolute -left-[9px] top-1 h-4 w-4 rounded-full bg-indigo-500 border-4 border-background shadow-sm" />
 
                                                             <div className="flex flex-col gap-1 group">
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="text-xs font-mono text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/30 px-1.5 py-0.5 rounded">
-                                                                        {engine.formatDate(event.startDate)}
-                                                                    </span>
-                                                                    {event.duration > 1 && (
-                                                                        <span className="text-[10px] text-muted-foreground">
-                                                                            — ends {engine.formatDate(event.endDate)}
+                                                                <div className="flex items-center justify-between gap-1">
+                                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                                        <span className="text-xs font-mono text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/30 px-1.5 py-0.5 rounded">
+                                                                            {engine.formatDate(event.startDate)}
                                                                         </span>
-                                                                    )}
+                                                                        {event.duration > 1 && (
+                                                                            <span className="text-[10px] text-muted-foreground">
+                                                                                — ends {engine.formatDate(event.endDate)}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <Button
+                                                                        onClick={() => handleDeleteEvent(event.id)}
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded shrink-0"
+                                                                    >
+                                                                        <Trash className="h-3.5 w-3.5" />
+                                                                    </Button>
                                                                 </div>
 
                                                                 <div className="flex items-center gap-2">

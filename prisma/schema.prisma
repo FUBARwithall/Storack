@@ -104,6 +104,9 @@ model TimelineEvent {
   calendarId  String
   calendar    Calendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
 
+  appearances CharacterAppearance[]
+  snapshots   CharacterSnapshot[]
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
 }
@@ -127,6 +130,7 @@ model Chapter {
   events    TimelineEvent[]
   characters Character[]
   locations  Location[]
+  snapshots  CharacterSnapshot[]
 
   createdAt DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
@@ -174,8 +178,45 @@ model Character {
   story       Story?   @relation(fields: [storyId], references: [id], onDelete: SetNull)
   chapters    Chapter[]
 
+  relationships CharacterRelationship[] @relation("CharacterSource")
+  relatedTo     CharacterRelationship[] @relation("CharacterTarget")
+  appearances   CharacterAppearance[]
+  appearancesAsTarget CharacterAppearance[] @relation("AppearanceTarget")
+  snapshots     CharacterSnapshot[]
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
+}
+
+model CharacterRelationship {
+  id           String    @id @default(cuid())
+  type         String    // e.g., "Brother of", "Friend of", "Rival of", "Parent of"
+  
+  characterId  String
+  character    Character @relation("CharacterSource", fields: [characterId], references: [id], onDelete: Cascade)
+  
+  targetId     String
+  target       Character @relation("CharacterTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  
+  @@unique([characterId, targetId, type])
+}
+
+model CharacterAppearance {
+  id          String        @id @default(cuid())
+  role        String        // e.g., "born", "died", "present", "fought"
+  description String?       // Optional extra context on their appearance
+  
+  characterId String
+  character   Character     @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  
+  eventId     String
+  event       TimelineEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  // Optional: another character involved in this event (e.g. "killed by", "married to")
+  targetCharacterId String?
+  targetCharacter   Character? @relation("AppearanceTarget", fields: [targetCharacterId], references: [id], onDelete: SetNull)
+  
+  @@unique([characterId, eventId, role])
 }
 
 model Location {
@@ -223,4 +264,33 @@ model RateLimit {
   expiresAt DateTime
 
   @@index([expiresAt])
+}
+
+model CharacterSnapshot {
+  id          String   @id @default(cuid())
+  label       String                        // e.g. "After Curse", "Post-Timeskip"
+  note        String?  @db.Text            // What changed and why
+
+  // Full state copy
+  name        String
+  role        String?
+  age         String?
+  gender      String?
+  species     String?
+  occupation  String?
+  personality String?  @db.Text
+  backstory   String?  @db.Text
+  avatarUrl   String?
+
+  characterId String
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  // Optional trigger anchors
+  eventId     String?
+  event       TimelineEvent? @relation(fields: [eventId], references: [id], onDelete: SetNull)
+
+  chapterId   String?
+  chapter     Chapter?  @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime @default(now())
 }
