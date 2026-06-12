@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import { login } from "./auth";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { rateLimit, getClientIp } from "./rate-limit";
 
 export async function registerAction(formData: FormData) {
     const username = formData.get("username") as string;
@@ -13,6 +14,14 @@ export async function registerAction(formData: FormData) {
     if (!username || !password) {
         return { error: "Username and password are required" };
     }
+
+    // Start of register rate limit
+    const ip = await getClientIp();
+    const rl = await rateLimit(`rl:register:${ip}`, 3, 60 * 60 * 1000);
+    if (!rl.success) {
+        return { error: "Too many account registrations. Please try again later." };
+    }
+    // End of register rate limit
 
     const existingUser = await prisma.user.findUnique({
         where: { username },
@@ -52,6 +61,14 @@ export async function loginAction(formData: FormData) {
     if (!username || !password) {
         return { error: "Username and password are required" };
     }
+
+    // Start of login rate limit
+    const ip = await getClientIp();
+    const rl = await rateLimit(`rl:login:${ip}`, 5, 15 * 60 * 1000);
+    if (!rl.success) {
+        return { error: "Too many login attempts. Please try again in 15 minutes." };
+    }
+    // End of login rate limit
 
     const user = await prisma.user.findUnique({
         where: { username },

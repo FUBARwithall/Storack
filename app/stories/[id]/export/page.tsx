@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getStoryById, getChapterById } from "@/lib/actions";
 import { requireUserId } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import DOMPurify from "isomorphic-dompurify";
 import { PrintControls } from "./PrintControls";
 import type { Metadata } from "next";
 
@@ -175,7 +176,7 @@ export default async function ExportPrintPage({
                             {/* Chapter HTML Content */}
                             <div
                                 className="prose max-w-none text-justify whitespace-pre-line"
-                                dangerouslySetInnerHTML={{ __html: ch.content || "" }}
+                                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(ch.content || "") }}
                             />
                         </div>
                     ))}

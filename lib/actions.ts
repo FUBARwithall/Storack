@@ -483,6 +483,16 @@ async function handleImageUploadAndTracking(
         return { sizeDelta: 0 };
     }
 
+    const match = base64String.match(/^data:([^;]+);base64,/);
+    if (!match) {
+        throw new Error("Invalid image format");
+    }
+    const mimeType = match[1];
+    const allowedMimeTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if (!allowedMimeTypes.includes(mimeType)) {
+        throw new Error("Invalid file type. Only JPEG, PNG, GIF, and WEBP images are allowed.");
+    }
+
     const sizeInBytes = Math.round((base64String.length * 3) / 4);
 
     let oldFileSize = 0;
@@ -814,6 +824,11 @@ export async function uploadStoryCover(id: string, formData: FormData) {
     const file = formData.get("coverImage") as File;
     if (!file) return { error: "No file uploaded" };
 
+    const allowedMimeTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if (!allowedMimeTypes.includes(file.type)) {
+        return { error: "Invalid file type. Only JPEG, PNG, GIF, and WEBP images are allowed." };
+    }
+
     let oldFileSize = 0;
     let oldUploadedFileId = null;
 
@@ -880,6 +895,11 @@ export async function uploadEditorImage(formData: FormData) {
 
     const file = formData.get("image") as File;
     if (!file) return { error: "No file uploaded" };
+
+    const allowedMimeTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if (!allowedMimeTypes.includes(file.type)) {
+        return { error: "Invalid file type. Only JPEG, PNG, GIF, and WEBP images are allowed." };
+    }
 
     const quotaCheck = await checkQuota(userId, file.size);
     if (!quotaCheck.allowed) {
@@ -1138,6 +1158,12 @@ export async function uploadResearchFile(storyId: string, noteId: string, formDa
 
         const file = formData.get("file") as File;
         if (!file) return { error: "No file uploaded" };
+
+        const dangerousExtensions = [".exe", ".bat", ".cmd", ".sh", ".bash", ".js", ".ts", ".html", ".htm", ".php", ".pl", ".py", ".rb", ".xml", ".msi", ".vbs"];
+        const fileExt = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
+        if (dangerousExtensions.includes(fileExt) || file.type === "text/html" || file.type === "image/svg+xml") {
+            return { error: "This file type is not allowed for security reasons." };
+        }
 
         const quotaCheck = await checkQuota(userId, file.size);
         if (!quotaCheck.allowed) {

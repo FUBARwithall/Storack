@@ -16,8 +16,14 @@ export async function POST(request: Request) {
         const hmac = crypto.createHmac("sha256", secret);
         const digest = hmac.update(rawBody).digest("hex");
 
-        // Verify webhook signature
-        if (signature !== digest) {
+        // Verify webhook signature using constant-time comparison
+        const digestBuffer = Buffer.from(digest, "utf8");
+        const signatureBuffer = Buffer.from(signature, "utf8");
+
+        if (
+            digestBuffer.length !== signatureBuffer.length ||
+            !crypto.timingSafeEqual(digestBuffer, signatureBuffer)
+        ) {
             return new Response("Invalid signature", { status: 401 });
         }
 

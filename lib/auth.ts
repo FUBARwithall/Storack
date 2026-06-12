@@ -33,11 +33,21 @@ export async function login(user: { id: string; username: string; avatarUrl?: st
     const expires = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours
     const session = await encrypt({ user, expires });
 
-    (await cookies()).set("session", session, { expires, httpOnly: true });
+    (await cookies()).set("session", session, {
+        expires,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+    });
 }
 
 export async function logout() {
-    (await cookies()).set("session", "", { expires: new Date(0) });
+    (await cookies()).set("session", "", {
+        expires: new Date(0),
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+    });
 }
 
 export async function getSession() {
@@ -74,5 +84,10 @@ export async function updateSessionUser(updates: { username?: string; avatarUrl?
     session.expires = expires;
     const newSessionToken = await encrypt(session);
     
-    (await cookies()).set("session", newSessionToken, { expires, httpOnly: true });
+    (await cookies()).set("session", newSessionToken, {
+        expires,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+    });
 }
