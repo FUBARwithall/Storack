@@ -5,9 +5,20 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Search, Plus, Globe, MoreHorizontal, MapPin, Shield, Book, Zap, Box, User, Pencil, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { WorldEntryForm } from "@/components/world/WorldEntryForm";
+import { LocationForm } from "@/components/world/LocationForm";
 import { CharacterForm } from "@/components/characters/CharacterForm";
-import { deleteLocation, deleteCharacter } from "@/lib/actions";
+import { FactionForm } from "@/components/world/FactionForm";
+import { LoreForm } from "@/components/world/LoreForm";
+import { SystemForm } from "@/components/world/SystemForm";
+import { ObjectForm } from "@/components/world/ObjectForm";
+import {
+    deleteLocation,
+    deleteCharacter,
+    deleteFaction,
+    deleteLore,
+    deleteWorldSystem,
+    deleteWorldObject
+} from "@/lib/actions";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -44,9 +55,14 @@ interface Character {
 interface WorldClientProps {
     initialLocations: Location[];
     initialCharacters: Character[];
+    initialFactions?: any[];
+    initialLores?: any[];
+    initialSystems?: any[];
+    initialObjects?: any[];
     worldId: string;
     storyId?: string;
     stories?: any[];
+    calendars?: any[];
 }
 
 const TypeIcon = ({ type }: { type: string }) => {
@@ -54,22 +70,37 @@ const TypeIcon = ({ type }: { type: string }) => {
         case 'Location': return <MapPin className="h-4 w-4" />;
         case 'Character': return <User className="h-4 w-4" />;
         case 'Faction': return <Shield className="h-4 w-4" />;
-        case 'System': return <Zap className="h-6 w-6" />;
-        case 'Object': return <Box className="h-6 w-6" />;
+        case 'System': return <Zap className="h-4 w-4" />;
+        case 'Object': return <Box className="h-4 w-4" />;
         case 'Lore': return <Book className="h-4 w-4" />;
         default: return <Globe className="h-4 w-4" />;
     }
 };
 
-export function WorldClient({ initialLocations, initialCharacters, worldId, storyId, stories = [] }: WorldClientProps) {
+export function WorldClient({
+    initialLocations,
+    initialCharacters,
+    initialFactions = [],
+    initialLores = [],
+    initialSystems = [],
+    initialObjects = [],
+    worldId,
+    storyId,
+    stories = [],
+    calendars = []
+}: WorldClientProps) {
     const router = useRouter();
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedCategory, setSelectedCategory] = useState("All");
 
     // Form states
-    const [viewMode, setViewMode] = useState<'list' | 'character_form' | 'entry_form'>('list');
+    const [viewMode, setViewMode] = useState<'list' | 'character_form' | 'location_form' | 'faction_form' | 'lore_form' | 'system_form' | 'object_form'>('list');
     const [editingChar, setEditingChar] = useState<any>(undefined);
-    const [editingEntry, setEditingEntry] = useState<any>(undefined);
+    const [editingLocation, setEditingLocation] = useState<any>(undefined);
+    const [editingFaction, setEditingFaction] = useState<any>(undefined);
+    const [editingLore, setEditingLore] = useState<any>(undefined);
+    const [editingSystem, setEditingSystem] = useState<any>(undefined);
+    const [editingObject, setEditingObject] = useState<any>(undefined);
 
     // Unified list for display
     const worldItems = [
@@ -85,6 +116,39 @@ export function WorldClient({ initialLocations, initialCharacters, worldId, stor
             type: 'Character',
             description: char.role || 'No role specified',
             sourceType: 'character' as const
+        })),
+        ...initialFactions.map(fac => ({
+            ...fac,
+            type: 'Faction',
+            category: fac.type,
+            avatarUrl: fac.imageUrl,
+            species: null,
+            occupation: null,
+            sourceType: 'faction' as const
+        })),
+        ...initialLores.map(lore => ({
+            ...lore,
+            type: 'Lore',
+            avatarUrl: lore.imageUrl,
+            species: null,
+            occupation: null,
+            sourceType: 'lore' as const
+        })),
+        ...initialSystems.map(sys => ({
+            ...sys,
+            type: 'System',
+            avatarUrl: sys.imageUrl,
+            species: null,
+            occupation: null,
+            sourceType: 'system' as const
+        })),
+        ...initialObjects.map(obj => ({
+            ...obj,
+            type: 'Object',
+            avatarUrl: obj.imageUrl,
+            species: null,
+            occupation: null,
+            sourceType: 'object' as const
         }))
     ];
 
@@ -97,15 +161,116 @@ export function WorldClient({ initialLocations, initialCharacters, worldId, stor
 
     const categories = ['All', 'Location', 'Character', 'Faction', 'Lore', 'System', 'Object'];
 
-    const handleCreateEntry = () => {
-        setEditingEntry(undefined);
-        setViewMode('entry_form');
+    const handleCreateLocation = () => {
+        setEditingLocation(undefined);
+        setViewMode('location_form');
+    };
+
+    const handleCreateFaction = () => {
+        setEditingFaction(undefined);
+        setViewMode('faction_form');
+    };
+
+    const handleCreateLore = () => {
+        setEditingLore(undefined);
+        setViewMode('lore_form');
+    };
+
+    const handleCreateSystem = () => {
+        setEditingSystem(undefined);
+        setViewMode('system_form');
+    };
+
+    const handleCreateObject = () => {
+        setEditingObject(undefined);
+        setViewMode('object_form');
+    };
+
+    const CreateButton = ({ size = "default", align = "end" }: { size?: "default" | "sm", align?: "end" | "center" }) => {
+        if (selectedCategory === "All") {
+            return (
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button size={size} className={size === "sm" ? "px-6 h-10 shadow-xl shadow-primary/20 transition-all hover:-translate-y-0.5" : "shadow-lg shadow-primary/20 h-10 px-6"}>
+                            <Plus className="mr-2 h-4 w-4" /> Create Entry
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align={align} className="w-48">
+                        <DropdownMenuItem onSelect={handleCreateLocation} className="cursor-pointer">
+                            <MapPin className="mr-2 h-4 w-4" /> Location
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={handleCreateFaction} className="cursor-pointer">
+                            <Shield className="mr-2 h-4 w-4" /> Faction
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={handleCreateLore} className="cursor-pointer">
+                            <Book className="mr-2 h-4 w-4" /> Lore
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={handleCreateSystem} className="cursor-pointer">
+                            <Zap className="mr-2 h-4 w-4" /> System
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={handleCreateObject} className="cursor-pointer">
+                            <Box className="mr-2 h-4 w-4" /> Object
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            );
+        }
+
+        const getCategoryActionAndDetails = () => {
+            switch (selectedCategory) {
+                case "Location":
+                    return { label: "Create Location", action: handleCreateLocation, icon: <MapPin className="mr-2 h-4 w-4" /> };
+                case "Faction":
+                    return { label: "Create Faction", action: handleCreateFaction, icon: <Shield className="mr-2 h-4 w-4" /> };
+                case "Lore":
+                    return { label: "Create Lore", action: handleCreateLore, icon: <Book className="mr-2 h-4 w-4" /> };
+                case "System":
+                    return { label: "Create System", action: handleCreateSystem, icon: <Zap className="mr-2 h-4 w-4" /> };
+                case "Object":
+                    return { label: "Create Object", action: handleCreateObject, icon: <Box className="mr-2 h-4 w-4" /> };
+                case "Character":
+                    return {
+                        label: "Create Character",
+                        action: () => {
+                            setEditingChar(undefined);
+                            setViewMode('character_form');
+                        },
+                        icon: <User className="mr-2 h-4 w-4" />
+                    };
+                default:
+                    return { label: "Create Location", action: handleCreateLocation, icon: <MapPin className="mr-2 h-4 w-4" /> };
+            }
+        };
+
+        const details = getCategoryActionAndDetails();
+
+        return (
+            <Button 
+                onClick={details.action} 
+                size={size} 
+                className={size === "sm" ? "px-6 h-10 shadow-xl shadow-primary/20 transition-all hover:-translate-y-0.5" : "shadow-lg shadow-primary/20 h-10 px-6"}
+            >
+                {details.icon} {details.label}
+            </Button>
+        );
     };
 
     const handleEdit = (item: any) => {
         if (item.sourceType === 'location') {
-            setEditingEntry(item);
-            setViewMode('entry_form');
+            setEditingLocation(item);
+            setViewMode('location_form');
+        } else if (item.sourceType === 'faction') {
+            setEditingFaction(item);
+            setViewMode('faction_form');
+        } else if (item.sourceType === 'lore') {
+            setEditingLore(item);
+            setViewMode('lore_form');
+        } else if (item.sourceType === 'system') {
+            setEditingSystem(item);
+            setViewMode('system_form');
+        } else if (item.sourceType === 'object') {
+            setEditingObject(item);
+            setViewMode('object_form');
         } else {
             setEditingChar(item);
             setViewMode('character_form');
@@ -116,6 +281,14 @@ export function WorldClient({ initialLocations, initialCharacters, worldId, stor
         if (confirm(`Are you sure you want to delete ${item.name}?`)) {
             if (item.sourceType === 'location') {
                 await deleteLocation(item.id);
+            } else if (item.sourceType === 'faction') {
+                await deleteFaction(item.id);
+            } else if (item.sourceType === 'lore') {
+                await deleteLore(item.id);
+            } else if (item.sourceType === 'system') {
+                await deleteWorldSystem(item.id);
+            } else if (item.sourceType === 'object') {
+                await deleteWorldObject(item.id);
             } else {
                 await deleteCharacter(item.id);
             }
@@ -131,6 +304,8 @@ export function WorldClient({ initialLocations, initialCharacters, worldId, stor
                     storyId={storyId}
                     stories={stories}
                     character={editingChar}
+                    locations={initialLocations}
+                    calendars={calendars}
                     onSave={() => {
                         setViewMode('list');
                         router.refresh();
@@ -141,14 +316,86 @@ export function WorldClient({ initialLocations, initialCharacters, worldId, stor
         );
     }
 
-    if (viewMode === 'entry_form') {
+    if (viewMode === 'location_form') {
         return (
             <div className="p-6 md:p-8 w-full max-w-full mx-auto animate-in fade-in duration-500">
-                <WorldEntryForm
+                <LocationForm
                     worldId={worldId}
                     storyId={storyId}
                     stories={stories}
-                    entry={editingEntry}
+                    entry={editingLocation}
+                    onSave={() => {
+                        setViewMode('list');
+                        router.refresh();
+                    }}
+                    onCancel={() => setViewMode('list')}
+                />
+            </div>
+        );
+    }
+
+    if (viewMode === 'faction_form') {
+        return (
+            <div className="p-6 md:p-8 w-full max-w-full mx-auto animate-in fade-in duration-500">
+                <FactionForm
+                    worldId={worldId}
+                    storyId={storyId}
+                    stories={stories}
+                    entry={editingFaction}
+                    onSave={() => {
+                        setViewMode('list');
+                        router.refresh();
+                    }}
+                    onCancel={() => setViewMode('list')}
+                />
+            </div>
+        );
+    }
+
+    if (viewMode === 'lore_form') {
+        return (
+            <div className="p-6 md:p-8 w-full max-w-full mx-auto animate-in fade-in duration-500">
+                <LoreForm
+                    worldId={worldId}
+                    storyId={storyId}
+                    stories={stories}
+                    entry={editingLore}
+                    onSave={() => {
+                        setViewMode('list');
+                        router.refresh();
+                    }}
+                    onCancel={() => setViewMode('list')}
+                />
+            </div>
+        );
+    }
+
+    if (viewMode === 'system_form') {
+        return (
+            <div className="p-6 md:p-8 w-full max-w-full mx-auto animate-in fade-in duration-500">
+                <SystemForm
+                    worldId={worldId}
+                    storyId={storyId}
+                    stories={stories}
+                    entry={editingSystem}
+                    onSave={() => {
+                        setViewMode('list');
+                        router.refresh();
+                    }}
+                    onCancel={() => setViewMode('list')}
+                />
+            </div>
+        );
+    }
+
+    if (viewMode === 'object_form') {
+        return (
+            <div className="p-6 md:p-8 w-full max-w-full mx-auto animate-in fade-in duration-500">
+                <ObjectForm
+                    worldId={worldId}
+                    storyId={storyId}
+                    stories={stories}
+                    entry={editingObject}
                     onSave={() => {
                         setViewMode('list');
                         router.refresh();
@@ -166,9 +413,7 @@ export function WorldClient({ initialLocations, initialCharacters, worldId, stor
                     <h1 className="text-3xl font-extrabold tracking-tight text-foreground">Worldbuilding</h1>
                     <p className="text-muted-foreground mt-1 text-sm">Lore, locations, and legends of your universe.</p>
                 </div>
-                <Button onClick={handleCreateEntry} className="shadow-lg shadow-primary/20 h-10 px-6">
-                    <Plus className="mr-2 h-4 w-4" /> Create Entry
-                </Button>
+                <CreateButton />
             </header>
 
             {/* Search and Categories */}
@@ -221,7 +466,7 @@ export function WorldClient({ initialLocations, initialCharacters, worldId, stor
                                     <div className="flex flex-wrap items-center gap-2">
                                         <h3 className="text-base sm:text-lg font-bold text-foreground group-hover:text-primary transition-colors truncate">{item.name}</h3>
                                         <span className="rounded-full bg-secondary/80 border border-muted px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
-                                            {item.type || 'Entry'}
+                                            {item.type || 'Entry'}{item.category ? ` • ${item.category}` : ''}
                                         </span>
                                         {item.story && (
                                             <span className="rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-semibold text-primary whitespace-nowrap">
@@ -262,12 +507,10 @@ export function WorldClient({ initialLocations, initialCharacters, worldId, stor
                     <p className="text-sm text-muted-foreground mt-2 max-w-xs text-center leading-relaxed opacity-70">
                         {searchTerm || selectedCategory !== "All"
                             ? "Try broadening your search or choosing a different category."
-                            : "Your world is empty. Start recording your legends and landmarks."}
+                            : "Your world is empty. Start recording your locations, factions, lore, systems, or objects."}
                     </p>
                     <div className="mt-8">
-                        <Button onClick={handleCreateEntry} size="sm" className="px-6 h-10 shadow-xl shadow-primary/20 transition-all hover:-translate-y-0.5">
-                            <Plus className="mr-2 h-4 w-4" /> Create First Entry
-                        </Button>
+                        <CreateButton size="sm" align="center" />
                     </div>
                 </div>
             )}

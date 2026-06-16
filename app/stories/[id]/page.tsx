@@ -35,11 +35,108 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
 
     const characters = await prisma.character.findMany({
         where: { storyId: id },
+        include: {
+            story: true,
+            birthplace: {
+                select: {
+                    id: true,
+                    name: true
+                }
+            },
+            relationships: {
+                include: {
+                    target: {
+                        select: {
+                            id: true,
+                            name: true,
+                            avatarUrl: true
+                        }
+                    }
+                }
+            },
+            relatedTo: {
+                include: {
+                    character: {
+                        select: {
+                            id: true,
+                            name: true,
+                            avatarUrl: true
+                        }
+                    }
+                }
+            },
+            appearances: {
+                include: {
+                    event: {
+                        include: {
+                            calendar: true
+                        }
+                    },
+                    targetCharacter: {
+                        select: { id: true, name: true, avatarUrl: true }
+                    }
+                }
+            },
+            snapshots: {
+                include: {
+                    event: {
+                        include: {
+                            calendar: true
+                        }
+                    },
+                    chapter: true,
+                    birthplace: {
+                        select: {
+                            id: true,
+                            name: true
+                        }
+                    }
+                },
+                orderBy: { createdAt: 'asc' }
+            }
+        },
         orderBy: { name: 'asc' }
     });
 
-    const locations = await prisma.location.findMany({
+    const events = await prisma.timelineEvent.findMany({
+        where: { worldId: story.worldId },
+        include: {
+            calendar: true
+        },
+        orderBy: { title: 'asc' }
+    });
+
+    const worldLocations = await prisma.location.findMany({
+        where: { worldId: story.worldId },
+        orderBy: { name: 'asc' }
+    });
+
+    const locations = (await prisma.location.findMany({
         where: { storyId: id },
+        orderBy: { name: 'asc' }
+    })).map(loc => ({ ...loc, type: 'Location' }));
+
+    const factions = await prisma.organization.findMany({
+        where: { storyId: id },
+        include: { story: true },
+        orderBy: { name: 'asc' }
+    });
+
+    const lores = await prisma.lore.findMany({
+        where: { storyId: id },
+        include: { story: true },
+        orderBy: { name: 'asc' }
+    });
+
+    const systems = await prisma.worldSystem.findMany({
+        where: { storyId: id },
+        include: { story: true },
+        orderBy: { name: 'asc' }
+    });
+
+    const objects = await prisma.worldObject.findMany({
+        where: { storyId: id },
+        include: { story: true },
         orderBy: { name: 'asc' }
     });
 
@@ -195,19 +292,28 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
 
                     <TabsContent value="characters" className="m-0">
                         <CharactersClient
-                            initialCharacters={characters}
+                            initialCharacters={characters as any}
                             worldId={story.worldId}
                             storyId={id}
                             stories={[story]}
+                            events={events as any}
+                            chapters={story.chapters}
+                            locations={worldLocations}
+                            calendars={calendars}
                         />
                     </TabsContent>
                     <TabsContent value="world" className="m-0">
                         <WorldClient
                             initialCharacters={characters}
                             initialLocations={locations}
+                            initialFactions={factions}
+                            initialLores={lores}
+                            initialSystems={systems}
+                            initialObjects={objects}
                             worldId={story.worldId}
                             storyId={id}
                             stories={[story]}
+                            calendars={calendars}
                         />
                     </TabsContent>
                     <TabsContent value="timeline" className="m-0 p-4 sm:p-8">

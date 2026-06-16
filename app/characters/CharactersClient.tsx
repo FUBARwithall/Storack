@@ -48,6 +48,11 @@ function getDisplayState(char: Character) {
             avatarUrl: latest.avatarUrl !== null ? latest.avatarUrl : char.avatarUrl,
             backstory: latest.backstory !== null ? latest.backstory : char.backstory,
             personality: latest.personality !== null ? latest.personality : char.personality,
+            height: latest.height !== undefined && latest.height !== null ? latest.height : char.height,
+            weight: latest.weight !== undefined && latest.weight !== null ? latest.weight : char.weight,
+            birthplace: latest.birthplace !== undefined && latest.birthplace !== null ? latest.birthplace : char.birthplace,
+            birthdate: latest.birthdate !== undefined && latest.birthdate !== null ? latest.birthdate : char.birthdate,
+            deathdate: latest.deathdate !== undefined && latest.deathdate !== null ? latest.deathdate : char.deathdate,
             isSnapshot: true,
             snapshotLabel: latest.label
         };
@@ -62,10 +67,35 @@ function getDisplayState(char: Character) {
         avatarUrl: char.avatarUrl,
         backstory: char.backstory,
         personality: char.personality,
+        height: char.height,
+        weight: char.weight,
+        birthplace: char.birthplace,
+        birthdate: char.birthdate,
+        deathdate: char.deathdate,
         isSnapshot: false,
         snapshotLabel: ""
     };
 }
+
+const isVerticalType = (type: string): boolean => {
+    const t = type.toLowerCase();
+    return (
+        t.includes("parent") ||
+        t.includes("child") ||
+        t.includes("mentor") ||
+        t.includes("apprentice") ||
+        t.includes("leader") ||
+        t.includes("follower") ||
+        t.includes("boss") ||
+        t.includes("subordinate") ||
+        t.includes("master") ||
+        t.includes("servant") ||
+        t.includes("superior") ||
+        t.includes("underling") ||
+        t.includes("creator") ||
+        t.includes("creation")
+    );
+};
 
 interface Character {
     id: string;
@@ -81,6 +111,12 @@ interface Character {
     worldId: string;
     storyId?: string | null;
     story?: { id: string, title: string } | null;
+    height?: string | null;
+    weight?: string | null;
+    birthplaceId?: string | null;
+    birthplace?: { id: string, name: string } | null;
+    birthdate?: any;
+    deathdate?: any;
     relationships?: {
         id: string;
         type: string;
@@ -145,6 +181,12 @@ interface Character {
             title: string;
         } | null;
         createdAt: string;
+        height?: string | null;
+        weight?: string | null;
+        birthplaceId?: string | null;
+        birthplace?: { id: string, name: string } | null;
+        birthdate?: any;
+        deathdate?: any;
     }[];
 }
 
@@ -155,9 +197,11 @@ interface CharactersClientProps {
     stories?: any[];
     events?: any[];
     chapters?: any[];
+    locations?: any[];
+    calendars?: any[];
 }
 
-export function CharactersClient({ initialCharacters, worldId, storyId, stories = [], events = [], chapters = [] }: CharactersClientProps) {
+export function CharactersClient({ initialCharacters, worldId, storyId, stories = [], events = [], chapters = [], locations = [], calendars = [] }: CharactersClientProps) {
     const router = useRouter();
     const [searchTerm, setSearchTerm] = useState("");
     const [viewMode, setViewMode] = useState<'list' | 'form' | 'detail'>('list');
@@ -194,6 +238,8 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
     const [snapPersonality, setSnapPersonality] = useState("");
     const [snapBackstory, setSnapBackstory] = useState("");
     const [snapAvatarUrl, setSnapAvatarUrl] = useState("");
+    const [snapHeight, setSnapHeight] = useState("");
+    const [snapWeight, setSnapWeight] = useState("");
     const [snapEventId, setSnapEventId] = useState("");
     const [snapChapterId, setSnapChapterId] = useState("");
     const [isSnapSaving, setIsSnapSaving] = useState(false);
@@ -349,6 +395,8 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
             setSnapPersonality(snapshot.personality || "");
             setSnapBackstory(snapshot.backstory || "");
             setSnapAvatarUrl(snapshot.avatarUrl || "");
+            setSnapHeight(snapshot.height || "");
+            setSnapWeight(snapshot.weight || "");
             setSnapEventId(snapshot.eventId || "none");
             setSnapChapterId(snapshot.chapterId || "none");
         } else {
@@ -364,6 +412,8 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
             setSnapPersonality(activeChar.personality || "");
             setSnapBackstory(activeChar.backstory || "");
             setSnapAvatarUrl(activeChar.avatarUrl || "");
+            setSnapHeight(activeChar.height || "");
+            setSnapWeight(activeChar.weight || "");
             setSnapEventId("");
             setSnapChapterId("");
         }
@@ -376,6 +426,7 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
         setIsSnapSaving(true);
         try {
             if (editingSnapshotId) {
+                const existingSnap = activeChar.snapshots?.find(s => s.id === editingSnapshotId);
                 await updateCharacterSnapshot(worldId, editingSnapshotId, {
                     label: snapLabel,
                     note: snapNote || undefined,
@@ -390,6 +441,11 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
                     avatarUrl: snapAvatarUrl || null,
                     eventId: snapEventId || null,
                     chapterId: snapChapterId || null,
+                    height: snapHeight || null,
+                    weight: snapWeight || null,
+                    birthplaceId: existingSnap?.birthplaceId || activeChar.birthplaceId || null,
+                    birthdate: existingSnap?.birthdate || activeChar.birthdate || null,
+                    deathdate: existingSnap?.deathdate || activeChar.deathdate || null,
                 });
             } else {
                 await addCharacterSnapshot(worldId, {
@@ -407,6 +463,11 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
                     avatarUrl: snapAvatarUrl || null,
                     eventId: snapEventId || null,
                     chapterId: snapChapterId || null,
+                    height: snapHeight || null,
+                    weight: snapWeight || null,
+                    birthplaceId: activeChar.birthplaceId || null,
+                    birthdate: activeChar.birthdate || null,
+                    deathdate: activeChar.deathdate || null,
                 });
             }
             setIsSnapshotModalOpen(false);
@@ -438,6 +499,8 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
                     storyId={storyId}
                     stories={stories}
                     character={editingCharacter}
+                    locations={locations}
+                    calendars={calendars}
                     onSave={() => {
                         setViewMode('list');
                         router.refresh();
@@ -551,6 +614,18 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
                                             <span className="text-zinc-500 dark:text-zinc-400 font-medium">Occupation</span>
                                             <span className="text-foreground font-semibold">{display.occupation || "—"}</span>
                                         </div>
+                                        <div className="flex justify-between text-sm border-t border-muted/10 pt-2.5">
+                                            <span className="text-zinc-500 dark:text-zinc-400 font-medium">Height</span>
+                                            <span className="text-foreground font-semibold">{display.height || "—"}</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm border-t border-muted/10 pt-2.5">
+                                            <span className="text-zinc-500 dark:text-zinc-400 font-medium">Weight</span>
+                                            <span className="text-foreground font-semibold">{display.weight || "—"}</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm border-t border-muted/10 pt-2.5">
+                                            <span className="text-zinc-500 dark:text-zinc-400 font-medium">Birthplace</span>
+                                            <span className="text-foreground font-semibold truncate max-w-[140px] text-right">{display.birthplace?.name || "—"}</span>
+                                        </div>
                                     </div>
 
 
@@ -597,117 +672,170 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
                                                 {display.backstory || "No backstory information added yet."}
                                             </p>
                                         </div>
+
+                                        {/* Chronology & Origins */}
+                                        {(() => {
+                                            const characterCalendarId = display.birthdate?.calendarId || display.deathdate?.calendarId;
+                                            const activeCalendar = (characterCalendarId && calendars?.find((c: any) => c.id === characterCalendarId)) || calendars?.[0];
+                                            const hasDates = display.birthdate || display.deathdate || display.birthplace;
+                                            if (!hasDates) return null;
+
+                                            let birthStr = "—";
+                                            let deathStr = "—";
+
+                                            if (activeCalendar) {
+                                                const engine = new CalendarEngine(toCalendarConfig(activeCalendar));
+                                                if (display.birthdate) {
+                                                    birthStr = engine.formatDate(display.birthdate);
+                                                }
+                                                if (display.deathdate) {
+                                                    deathStr = engine.formatDate(display.deathdate);
+                                                }
+                                            }
+
+                                            return (
+                                                <div className="space-y-4 border-t border-border/40 pt-6">
+                                                    <h3 className="font-bold text-sm uppercase tracking-wider flex items-center gap-2 text-foreground">
+                                                        <CalendarIcon className="h-4 w-4 text-primary" /> Chronology & Origins
+                                                    </h3>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 bg-card/20 p-4 border border-border/30">
+                                                        <div>
+                                                            <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-1">Birth Date</p>
+                                                            <p className="text-sm font-semibold text-foreground">{birthStr}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-1">Death Date</p>
+                                                            <p className="text-sm font-semibold text-foreground">{deathStr}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-1">Birthplace</p>
+                                                            <p className="text-sm font-semibold text-foreground">{display.birthplace?.name || "—"}</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
                                 )}
 
                                 {/* RELATIONSHIPS TAB */}
-                                {activeTab === 'relationships' && (
-                                    <div className="space-y-6">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <h3 className="font-bold text-lg text-foreground">Relations List</h3>
-                                                <p className="text-xs text-muted-foreground">Connections to other characters in the universe.</p>
-                                            </div>
-                                            <Button size="sm" onClick={() => setIsRelationModalOpen(true)} className="h-9 px-4">
-                                                <Plus className="mr-1.5 h-4 w-4" /> Add Relationship
-                                            </Button>
-                                        </div>
-
-                                        {((activeChar.relationships?.length || 0) > 0 || (activeChar.relatedTo?.length || 0) > 0) ? (
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                                                {/* Direct (Outbound) Relations */}
-                                                {activeChar.relationships?.map((rel) => (
-                                                    <div key={rel.id} className="group relative overflow-hidden bg-card/60 hover:shadow-md transition-all border border-border rounded-none shadow-sm flex h-28">
-                                                        {/* Left: Avatar (1:1 Ratio) */}
-                                                        <div className="aspect-square h-full bg-muted border-r border-border overflow-hidden shrink-0 flex items-center justify-center relative shadow-inner">
-                                                            {rel.target.avatarUrl ? (
-                                                                // eslint-disable-next-line @next/next/no-img-element
-                                                                <img src={rel.target.avatarUrl} alt={rel.target.name} className="h-full w-full object-cover" />
-                                                            ) : (
-                                                                <User className="h-8 w-8 text-muted-foreground/30" />
-                                                            )}
-                                                        </div>
-                                                        {/* Right: Content */}
-                                                        <div className="flex-1 p-4 min-w-0 flex flex-col justify-center">
-                                                            <div className="mb-1">
-                                                                <span className="text-[10px] font-bold text-primary uppercase tracking-widest bg-primary/10 border border-primary/20 px-2.5 py-1 rounded-none inline-flex whitespace-nowrap">
-                                                                    {rel.type}
-                                                                </span>
-                                                            </div>
-                                                            <h4 className="text-base font-bold text-foreground truncate leading-tight pr-8">{rel.target.name}</h4>
-                                                        </div>
-                                                        {/* Top-right dropdown */}
-                                                        <div className="absolute top-2 right-2">
-                                                            <DropdownMenu>
-                                                                <DropdownMenuTrigger asChild>
-                                                                    <Button variant="ghost" size="icon" className="h-7 w-7 rounded-none opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground">
-                                                                        <MoreHorizontal className="h-4 w-4" />
-                                                                    </Button>
-                                                                </DropdownMenuTrigger>
-                                                                <DropdownMenuContent align="end" className="rounded-none w-36">
-                                                                    <DropdownMenuItem onClick={() => handleStartEditRelationship(rel.id, rel.targetId, rel.type)} className="gap-2 cursor-pointer">
-                                                                        <Pencil className="h-3.5 w-3.5" /> Edit relation
-                                                                    </DropdownMenuItem>
-                                                                    <DropdownMenuItem onClick={() => handleDeleteRelationship(rel.id)} className="gap-2 cursor-pointer text-destructive focus:text-destructive">
-                                                                        <Trash2 className="h-3.5 w-3.5" /> Remove
-                                                                    </DropdownMenuItem>
-                                                                </DropdownMenuContent>
-                                                            </DropdownMenu>
-                                                        </div>
-                                                    </div>
-                                                ))}
-
-                                                {/* Inbound Relations */}
-                                                {activeChar.relatedTo?.map((rel) => (
-                                                    <div key={rel.id} className="group relative overflow-hidden bg-card/40 border border-border border-dashed rounded-none shadow-sm flex h-28">
-                                                        {/* Left: Avatar (1:1 Ratio) */}
-                                                        <div className="aspect-square h-full bg-muted border-r border-border overflow-hidden shrink-0 flex items-center justify-center relative shadow-inner">
-                                                            {rel.character.avatarUrl ? (
-                                                                // eslint-disable-next-line @next/next/no-img-element
-                                                                <img src={rel.character.avatarUrl} alt={rel.character.name} className="h-full w-full object-cover" />
-                                                            ) : (
-                                                                <User className="h-8 w-8 text-muted-foreground/30" />
-                                                            )}
-                                                        </div>
-                                                        {/* Right: Content */}
-                                                        <div className="flex-1 p-4 min-w-0 flex flex-col justify-center">
-                                                            <div className="mb-1">
-                                                                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest bg-muted border px-2.5 py-1 rounded-none inline-flex whitespace-nowrap">
-                                                                    {rel.type}
-                                                                </span>
-                                                            </div>
-                                                            <h4 className="text-base font-bold text-foreground truncate leading-tight pr-8">{rel.character.name}</h4>
-                                                        </div>
-                                                        {/* Top-right dropdown */}
-                                                        <div className="absolute top-2 right-2">
-                                                            <DropdownMenu>
-                                                                <DropdownMenuTrigger asChild>
-                                                                    <Button variant="ghost" size="icon" className="h-7 w-7 rounded-none opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground">
-                                                                        <MoreHorizontal className="h-4 w-4" />
-                                                                    </Button>
-                                                                </DropdownMenuTrigger>
-                                                                <DropdownMenuContent align="end" className="rounded-none w-36">
-                                                                    <DropdownMenuItem onClick={() => handleStartEditRelationship(rel.id, rel.characterId, rel.type)} className="gap-2 cursor-pointer">
-                                                                        <Pencil className="h-3.5 w-3.5" /> Edit relation
-                                                                    </DropdownMenuItem>
-                                                                    <DropdownMenuItem onClick={() => handleDeleteRelationship(rel.id)} className="gap-2 cursor-pointer text-destructive focus:text-destructive">
-                                                                        <Trash2 className="h-3.5 w-3.5" /> Remove
-                                                                    </DropdownMenuItem>
-                                                                </DropdownMenuContent>
-                                                            </DropdownMenu>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <div className="text-center py-12 border border-dashed rounded-none bg-muted/5 flex flex-col items-center justify-center">
-                                                <Heart className="h-8 w-8 text-muted-foreground/40 mb-3" />
-                                                <h4 className="font-semibold text-foreground">No relationships logged</h4>
-                                                <p className="text-xs text-muted-foreground mt-1 max-w-xs leading-relaxed">Introduce relations to describe how characters connect inside the chronicle.</p>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
+                                {activeTab === 'relationships' && (() => {
+                                     const directRelations = activeChar.relationships || [];
+                                     const inboundRelations = activeChar.relatedTo || [];
+                                     const hasRelations = directRelations.length > 0 || inboundRelations.length > 0;
+ 
+                                     return (
+                                         <div className="space-y-6">
+                                             <div className="flex items-center justify-between">
+                                                 <div>
+                                                     <h3 className="font-bold text-lg text-foreground">Relations List</h3>
+                                                     <p className="text-xs text-muted-foreground">Connections to other characters in the universe.</p>
+                                                 </div>
+                                                 <Button size="sm" onClick={() => setIsRelationModalOpen(true)} className="h-9 px-4">
+                                                     <Plus className="mr-1.5 h-4 w-4" /> Add Relationship
+                                                 </Button>
+                                             </div>
+ 
+                                             {hasRelations ? (
+                                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                                                     {directRelations.map((rel) => {
+                                                         return (
+                                                             <div key={rel.id} className="group relative overflow-hidden bg-card/60 hover:shadow-md transition-all border border-border rounded-none shadow-sm flex flex-col w-full">
+                                                                 {/* Relation Type Header */}
+                                                                 <div className="pt-3 pb-2 px-3 flex items-center justify-between border-b border-border/10 relative">
+                                                                     <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500 mx-auto">
+                                                                         {rel.type}
+                                                                     </span>
+                                                                     <div className="absolute right-2 top-1.5 z-10">
+                                                                         <DropdownMenu>
+                                                                             <DropdownMenuTrigger asChild>
+                                                                                 <Button variant="ghost" size="icon" className="h-7 w-7 rounded-none opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground">
+                                                                                     <MoreHorizontal className="h-4 w-4" />
+                                                                                 </Button>
+                                                                             </DropdownMenuTrigger>
+                                                                             <DropdownMenuContent align="end" className="rounded-none w-36">
+                                                                                 <DropdownMenuItem onClick={() => handleStartEditRelationship(rel.id, rel.targetId, rel.type)} className="gap-2 cursor-pointer">
+                                                                                     <Pencil className="h-3.5 w-3.5" /> Edit relation
+                                                                                 </DropdownMenuItem>
+                                                                                 <DropdownMenuItem onClick={() => handleDeleteRelationship(rel.id)} className="gap-2 cursor-pointer text-destructive focus:text-destructive">
+                                                                                     <Trash2 className="h-3.5 w-3.5" /> Remove
+                                                                                 </DropdownMenuItem>
+                                                                             </DropdownMenuContent>
+                                                                         </DropdownMenu>
+                                                                     </div>
+                                                                 </div>
+                                                                 
+                                                                 {/* Stretched Image */}
+                                                                 <div className="w-full aspect-square bg-muted overflow-hidden relative shadow-inner flex items-center justify-center">
+                                                                     {rel.target.avatarUrl ? (
+                                                                         <img src={rel.target.avatarUrl} alt={rel.target.name} className="h-full w-full object-cover" />
+                                                                     ) : (
+                                                                         <User className="h-12 w-12 text-zinc-500/20" />
+                                                                     )}
+                                                                 </div>
+ 
+                                                                 {/* Name Footer */}
+                                                                 <div className="py-3 px-2 text-center bg-card/40 border-t border-border/10">
+                                                                     <h4 className="text-sm font-bold text-foreground truncate">{rel.target.name}</h4>
+                                                                 </div>
+                                                             </div>
+                                                         );
+                                                     })}
+ 
+                                                     {inboundRelations.map((rel) => {
+                                                         return (
+                                                             <div key={rel.id} className="group relative overflow-hidden bg-card/40 border border-border border-dashed rounded-none shadow-sm flex flex-col w-full">
+                                                                 {/* Relation Type Header */}
+                                                                 <div className="pt-3 pb-2 px-3 flex items-center justify-between border-b border-border/10 relative">
+                                                                     <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500 mx-auto">
+                                                                         {rel.type} <span className="opacity-60 text-[8px]">(Inbound)</span>
+                                                                     </span>
+                                                                     <div className="absolute right-2 top-1.5 z-10">
+                                                                         <DropdownMenu>
+                                                                             <DropdownMenuTrigger asChild>
+                                                                                 <Button variant="ghost" size="icon" className="h-7 w-7 rounded-none opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground">
+                                                                                     <MoreHorizontal className="h-4 w-4" />
+                                                                                 </Button>
+                                                                             </DropdownMenuTrigger>
+                                                                             <DropdownMenuContent align="end" className="rounded-none w-36">
+                                                                                 <DropdownMenuItem onClick={() => handleStartEditRelationship(rel.id, rel.characterId, rel.type)} className="gap-2 cursor-pointer">
+                                                                                     <Pencil className="h-3.5 w-3.5" /> Edit relation
+                                                                                 </DropdownMenuItem>
+                                                                                 <DropdownMenuItem onClick={() => handleDeleteRelationship(rel.id)} className="gap-2 cursor-pointer text-destructive focus:text-destructive">
+                                                                                     <Trash2 className="h-3.5 w-3.5" /> Remove
+                                                                                 </DropdownMenuItem>
+                                                                             </DropdownMenuContent>
+                                                                         </DropdownMenu>
+                                                                     </div>
+                                                                 </div>
+                                                                 
+                                                                 {/* Stretched Image */}
+                                                                 <div className="w-full aspect-square bg-muted overflow-hidden relative shadow-inner flex items-center justify-center">
+                                                                     {rel.character.avatarUrl ? (
+                                                                         <img src={rel.character.avatarUrl} alt={rel.character.name} className="h-full w-full object-cover" />
+                                                                     ) : (
+                                                                         <User className="h-12 w-12 text-zinc-500/20" />
+                                                                     )}
+                                                                 </div>
+ 
+                                                                 {/* Name Footer */}
+                                                                 <div className="py-3 px-2 text-center bg-card/40 border-t border-border/10">
+                                                                     <h4 className="text-sm font-bold text-foreground truncate">{rel.character.name}</h4>
+                                                                 </div>
+                                                             </div>
+                                                         );
+                                                     })}
+                                                 </div>
+                                             ) : (
+                                                 <div className="text-center py-12 border border-dashed rounded-none bg-muted/5 flex flex-col items-center justify-center">
+                                                     <Heart className="h-8 w-8 text-muted-foreground/40 mb-3" />
+                                                     <h4 className="font-semibold text-foreground">No relationships logged</h4>
+                                                     <p className="text-xs text-muted-foreground mt-1 max-w-xs leading-relaxed">Introduce relations to describe how characters connect inside the chronicle.</p>
+                                                 </div>
+                                             )}
+                                         </div>
+                                     );
+                                 })()}
 
                                 {/* TIMELINE TAB */}
                                 {activeTab === 'timeline' && (
@@ -882,14 +1010,14 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
                 {/* MODAL: ADD/EDIT RELATIONSHIP */}
                 {isRelationModalOpen && (
                     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
-                        <Card className="bg-card border border-border rounded-none w-full max-w-md p-6 space-y-4 shadow-xl relative animate-in zoom-in duration-300">
-                            <div className="flex items-center justify-between border-b pb-2">
+                        <Card className="bg-card border border-border rounded-none w-full max-w-md p-6 shadow-xl relative animate-in zoom-in duration-300">
+                            <div className="flex items-center justify-between border-b pb-1.5">
                                 <h3 className="font-bold text-lg text-foreground flex items-center gap-2">
                                     <Heart className="h-5 w-5 text-primary" /> {editingRelationshipId ? "Edit Relationship" : "Add Relationship"}
                                 </h3>
                                 <button onClick={() => { setIsRelationModalOpen(false); setEditingRelationshipId(null); }} className="text-muted-foreground hover:text-foreground text-xl font-bold">&times;</button>
                             </div>
-                            <form onSubmit={handleSaveRelationship} className="space-y-4 pt-2">
+                            <form onSubmit={handleSaveRelationship} className="space-y-4 -mt-1">
                                 <div className="space-y-2">
                                     <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Target Character *</Label>
                                     <Select value={relationTargetId} onValueChange={setRelationTargetId} required disabled={!!editingRelationshipId}>
@@ -963,14 +1091,14 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
                 {/* MODAL: LINK TIMELINE EVENT */}
                 {isAppearanceModalOpen && (
                     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
-                        <Card className="bg-card border border-border rounded-2xl w-full max-w-md p-6 space-y-4 shadow-xl relative animate-in zoom-in duration-300">
-                            <div className="flex items-center justify-between border-b pb-2">
+                        <Card className="bg-card border border-border rounded-2xl w-full max-w-md p-6 shadow-xl relative animate-in zoom-in duration-300">
+                            <div className="flex items-center justify-between border-b pb-1.5">
                                 <h3 className="font-bold text-lg text-foreground flex items-center gap-2">
                                     <CalendarIcon className="h-5 w-5 text-primary" /> Link Timeline Event
                                 </h3>
                                 <button onClick={() => setIsAppearanceModalOpen(false)} className="text-muted-foreground hover:text-foreground text-xl font-bold">&times;</button>
                             </div>
-                            <form onSubmit={handleAddAppearance} className="space-y-4 pt-2">
+                            <form onSubmit={handleAddAppearance} className="space-y-4 -mt-1">
                                 <div className="space-y-2">
                                     <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Timeline Event *</Label>
                                     <Select value={appEventId} onValueChange={setAppEventId} required>
@@ -1068,15 +1196,15 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
                 {/* MODAL: CREATE SNAPSHOT */}
                 {isSnapshotModalOpen && (
                     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
-                        <Card className="w-full max-w-xl bg-card border border-border rounded-none shadow-lg max-h-[90vh] overflow-y-auto relative animate-in zoom-in duration-300 p-6 space-y-4">
-                            <div className="flex items-center justify-between border-b pb-2">
+                        <Card className="w-full max-w-xl bg-card border border-border rounded-none shadow-lg max-h-[90vh] overflow-y-auto relative animate-in zoom-in duration-300 p-6">
+                            <div className="flex items-center justify-between border-b pb-1.5">
                                 <h3 className="font-bold text-lg text-foreground flex items-center gap-2">
                                     <Clock className="h-5 w-5 text-primary" /> {editingSnapshotId ? "Edit Snapshot" : "Create Snapshot"}
                                 </h3>
                                 <button onClick={() => setIsSnapshotModalOpen(false)} className="text-muted-foreground hover:text-foreground text-xl font-bold">&times;</button>
                             </div>
                             
-                            <form onSubmit={handleAddSnapshot} className="space-y-4">
+                            <form onSubmit={handleAddSnapshot} className="space-y-4 -mt-1">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2 col-span-2">
                                         <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Snapshot Label *</Label>
@@ -1165,6 +1293,16 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
                                     <div className="space-y-2">
                                         <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Occupation</Label>
                                         <Input value={snapOccupation} onChange={(e) => setSnapOccupation(e.target.value)} className="h-10 bg-card/50" />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Height</Label>
+                                        <Input value={snapHeight} onChange={(e) => setSnapHeight(e.target.value)} className="h-10 bg-card/50" />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Weight</Label>
+                                        <Input value={snapWeight} onChange={(e) => setSnapWeight(e.target.value)} className="h-10 bg-card/50" />
                                     </div>
 
                                     <div className="space-y-2 col-span-2">

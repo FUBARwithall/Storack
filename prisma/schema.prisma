@@ -54,12 +54,16 @@ model World {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
 
-  calendars   Calendar[]
-  chapters    Chapter[]
-  characters  Character[]
-  locations   Location[]
-  events      TimelineEvent[]
-  stories     Story[]
+  calendars     Calendar[]
+  chapters      Chapter[]
+  characters    Character[]
+  locations     Location[]
+  events        TimelineEvent[]
+  stories       Story[]
+  organizations Organization[]
+  lores         Lore[]
+  systems       WorldSystem[]
+  objects       WorldObject[]
 }
 
 model Calendar {
@@ -150,10 +154,14 @@ model Story {
   worldId     String
   world       World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
   
-  chapters    Chapter[]
-  characters  Character[]
-  locations   Location[]
-  notes       Note[]
+  chapters      Chapter[]
+  characters    Character[]
+  locations     Location[]
+  notes         Note[]
+  organizations Organization[]
+  lores         Lore[]
+  systems       WorldSystem[]
+  objects       WorldObject[]
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
@@ -171,6 +179,17 @@ model Character {
   backstory   String?  @db.Text
   avatarUrl   String?
 
+  birthdate        Json?
+  deathdate        Json?
+  resurrectionDate Json?
+  height           String?
+  weight           String?
+  hairColor        String?
+  eyeColor         String?
+  skinColor        String?
+  birthplaceId     String?
+  birthplace       Location? @relation("CharacterBirthplace", fields: [birthplaceId], references: [id], onDelete: SetNull)
+
   worldId     String
   world       World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
   
@@ -178,11 +197,12 @@ model Character {
   story       Story?   @relation(fields: [storyId], references: [id], onDelete: SetNull)
   chapters    Chapter[]
 
-  relationships CharacterRelationship[] @relation("CharacterSource")
-  relatedTo     CharacterRelationship[] @relation("CharacterTarget")
-  appearances   CharacterAppearance[]
-  appearancesAsTarget CharacterAppearance[] @relation("AppearanceTarget")
-  snapshots     CharacterSnapshot[]
+  relationships         CharacterRelationship[] @relation("CharacterSource")
+  relatedTo             CharacterRelationship[] @relation("CharacterTarget")
+  appearances           CharacterAppearance[]
+  appearancesAsTarget   CharacterAppearance[] @relation("AppearanceTarget")
+  snapshots             CharacterSnapshot[]
+  organizationMemberships OrganizationMember[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
@@ -222,7 +242,6 @@ model CharacterAppearance {
 model Location {
   id          String   @id @default(cuid())
   name        String
-  type        String?
   description String?
   mapUrl      String?
   imageUrl    String?
@@ -233,6 +252,9 @@ model Location {
   storyId     String?
   story       Story?   @relation(fields: [storyId], references: [id], onDelete: SetNull)
   chapters    Chapter[]
+
+  bornCharacters      Character[]         @relation("CharacterBirthplace")
+  snapshotBirthplaces CharacterSnapshot[] @relation("SnapshotBirthplace")
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
@@ -282,6 +304,17 @@ model CharacterSnapshot {
   backstory   String?  @db.Text
   avatarUrl   String?
 
+  birthdate        Json?
+  deathdate        Json?
+  resurrectionDate Json?
+  height           String?
+  weight           String?
+  hairColor        String?
+  eyeColor         String?
+  skinColor        String?
+  birthplaceId     String?
+  birthplace       Location? @relation("SnapshotBirthplace", fields: [birthplaceId], references: [id], onDelete: SetNull)
+
   characterId String
   character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
 
@@ -293,4 +326,97 @@ model CharacterSnapshot {
   chapter     Chapter?  @relation(fields: [chapterId], references: [id], onDelete: SetNull)
 
   createdAt   DateTime @default(now())
+}
+
+// --- Organization ---
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   @default("Faction") // free-form: Faction, Guild, Military Unit, etc.
+  description String?  @db.Text
+  imageUrl    String?
+  tags        String[]
+
+  parentId    String?
+  parent      Organization?  @relation("OrgChildren", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Organization[] @relation("OrgChildren")
+
+  worldId     String
+  world       World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  storyId     String?
+  story       Story?   @relation(fields: [storyId], references: [id], onDelete: SetNull)
+
+  members     OrganizationMember[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+}
+
+model OrganizationMember {
+  id             String       @id @default(cuid())
+  role           String?      // free-form: Leader, Member, Agent, etc.
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  characterId    String
+  character      Character    @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, characterId])
+}
+
+// --- Lore ---
+model Lore {
+  id           String   @id @default(cuid())
+  name         String
+  category     String?  // free-form: Myth, History, Religion, Document, etc.
+  description  String?  @db.Text
+  imageUrl     String?
+  referenceUrl String?
+  tags         String[]
+
+  worldId      String
+  world        World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  storyId      String?
+  story        Story?   @relation(fields: [storyId], references: [id], onDelete: SetNull)
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+}
+
+// --- WorldSystem ---
+model WorldSystem {
+  id           String   @id @default(cuid())
+  name         String
+  category     String?  // free-form: Magic, Economy, Law, Technology, etc.
+  description  String?  @db.Text
+  imageUrl     String?
+  referenceUrl String?
+  tags         String[]
+
+  worldId      String
+  world        World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  storyId      String?
+  story        Story?   @relation(fields: [storyId], references: [id], onDelete: SetNull)
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+}
+
+// --- WorldObject ---
+model WorldObject {
+  id           String   @id @default(cuid())
+  name         String
+  category     String?  // free-form: Weapon, Relic, Artifact, Vehicle, etc.
+  description  String?  @db.Text
+  imageUrl     String?
+  referenceUrl String?
+  tags         String[]
+
+  worldId      String
+  world        World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  storyId      String?
+  story        Story?   @relation(fields: [storyId], references: [id], onDelete: SetNull)
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
 }

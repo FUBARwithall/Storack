@@ -7,10 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { createLocation, updateLocation } from "@/lib/actions";
-import { Globe, MapPin, Shield, Book, Zap, Box, Loader2, ChevronLeft, Upload, X } from "lucide-react";
+import { createLore, updateLore } from "@/lib/actions";
+import { Loader2, Upload, X } from "lucide-react";
 
-interface WorldEntryFormProps {
+interface LoreFormProps {
     worldId: string;
     storyId?: string;
     stories?: any[];
@@ -19,19 +19,11 @@ interface WorldEntryFormProps {
     onCancel: () => void;
 }
 
-const CATEGORIES = [
-    { value: 'Location', icon: <MapPin className="h-4 w-4" /> },
-    { value: 'Faction', icon: <Shield className="h-4 w-4" /> },
-    { value: 'Lore', icon: <Book className="h-4 w-4" /> },
-    { value: 'System', icon: <Zap className="h-4 w-4" /> },
-    { value: 'Object', icon: <Box className="h-4 w-4" /> },
-];
-
-export function WorldEntryForm({ worldId, storyId, stories = [], entry, onSave, onCancel }: WorldEntryFormProps) {
+export function LoreForm({ worldId, storyId, stories = [], entry, onSave, onCancel }: LoreFormProps) {
     const [name, setName] = useState(entry?.name || "");
-    const [type, setType] = useState(entry?.type || "Location");
+    const [category, setCategory] = useState(entry?.category || "History");
     const [description, setDescription] = useState(entry?.description || "");
-    const [mapUrl, setMapUrl] = useState(entry?.mapUrl || "");
+    const [referenceUrl, setReferenceUrl] = useState(entry?.referenceUrl || "");
     const [imageUrl, setImageUrl] = useState(entry?.imageUrl || "");
     const [selectedStoryId, setSelectedStoryId] = useState(entry?.storyId || storyId || "none");
     const [isLoading, setIsLoading] = useState(false);
@@ -42,9 +34,9 @@ export function WorldEntryForm({ worldId, storyId, stories = [], entry, onSave, 
     useEffect(() => {
         if (entry) {
             setName(entry.name || "");
-            setType(entry.type || "Location");
+            setCategory(entry.category || "History");
             setDescription(entry.description || "");
-            setMapUrl(entry.mapUrl || "");
+            setReferenceUrl(entry.referenceUrl || "");
             setImageUrl(entry.imageUrl || "");
             setSelectedStoryId(entry.storyId || "none");
         } else {
@@ -71,20 +63,20 @@ export function WorldEntryForm({ worldId, storyId, stories = [], entry, onSave, 
         try {
             const data = {
                 name,
-                type,
+                category,
                 description,
-                mapUrl: mapUrl || undefined,
+                referenceUrl: referenceUrl || undefined,
                 imageUrl: imageUrl || undefined,
                 storyId: selectedStoryId === "none" ? null : selectedStoryId
             };
             if (isEdit) {
-                await updateLocation(entry.id, data);
+                await updateLore(entry.id, data);
             } else {
-                await createLocation(worldId, data);
+                await createLore(worldId, data);
             }
             onSave();
         } catch (error) {
-            console.error("Failed to save world entry:", error);
+            console.error("Failed to save lore:", error);
         } finally {
             setIsLoading(false);
         }
@@ -93,9 +85,9 @@ export function WorldEntryForm({ worldId, storyId, stories = [], entry, onSave, 
     return (
         <Card className="max-w-5xl mx-auto">
             <CardHeader>
-                <CardTitle>{isEdit ? "Edit World Entry" : "Create World Entry"}</CardTitle>
+                <CardTitle>{isEdit ? "Edit Lore" : "Create Lore"}</CardTitle>
                 <CardDescription>
-                    Document a location, faction, lore, or system in your world.
+                    Document a myth, historical event, religion, or document in your world.
                 </CardDescription>
             </CardHeader>
             <CardContent>
@@ -142,10 +134,10 @@ export function WorldEntryForm({ worldId, storyId, stories = [], entry, onSave, 
                         <div className="lg:col-span-7 flex flex-col justify-between gap-6">
                             <div className="space-y-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="name" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Entry Name</Label>
+                                    <Label htmlFor="name" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Lore Title</Label>
                                     <Input
                                         id="name"
-                                        placeholder="e.g. The Silver Peaks"
+                                        placeholder="e.g. The Great Shattering"
                                         value={name}
                                         onChange={(e) => setName(e.target.value)}
                                         required
@@ -153,24 +145,17 @@ export function WorldEntryForm({ worldId, storyId, stories = [], entry, onSave, 
                                     />
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="type" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Category</Label>
-                                        <Select value={type} onValueChange={setType}>
-                                            <SelectTrigger id="type" className="h-11 w-full bg-card/50">
-                                                <SelectValue placeholder="Select type" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {CATEGORIES.map((cat) => (
-                                                    <SelectItem key={cat.value} value={cat.value}>
-                                                        <div className="flex items-center gap-2">
-                                                            {cat.icon}
-                                                            <span>{cat.value}</span>
-                                                        </div>
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+                                        <Label htmlFor="category" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Category</Label>
+                                        <Input
+                                            id="category"
+                                            placeholder="e.g. Myth, History, Religion"
+                                            value={category}
+                                            onChange={(e) => setCategory(e.target.value)}
+                                            required
+                                            className="h-11 bg-card/50"
+                                        />
                                     </div>
 
                                     <div className="space-y-2">
@@ -192,12 +177,12 @@ export function WorldEntryForm({ worldId, storyId, stories = [], entry, onSave, 
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="mapUrl" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Reference URL (Optional)</Label>
+                                    <Label htmlFor="referenceUrl" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Reference URL (Optional)</Label>
                                     <Input
-                                        id="mapUrl"
+                                        id="referenceUrl"
                                         placeholder="https://..."
-                                        value={mapUrl}
-                                        onChange={(e) => setMapUrl(e.target.value)}
+                                        value={referenceUrl}
+                                        onChange={(e) => setReferenceUrl(e.target.value)}
                                         className="h-11 bg-card/50"
                                     />
                                 </div>
@@ -206,10 +191,10 @@ export function WorldEntryForm({ worldId, storyId, stories = [], entry, onSave, 
                     </div>
 
                     <div className="space-y-2 pt-2">
-                        <Label htmlFor="description" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Description & Lore</Label>
+                        <Label htmlFor="description" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Description & Legend Details</Label>
                         <Textarea
                             id="description"
-                            placeholder="A brief summary or detailed history..."
+                            placeholder="A brief summary or detailed account of this lore entry..."
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
                             className="bg-card/50 min-h-[150px] resize-none"
@@ -228,9 +213,9 @@ export function WorldEntryForm({ worldId, storyId, stories = [], entry, onSave, 
                         <Button
                             type="submit"
                             disabled={isLoading || !name.trim()}
-                            isLoading={isLoading}
                         >
-                            {isEdit ? "Update Entry" : "Save Entry"}
+                            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {isEdit ? "Update Lore" : "Save Lore"}
                         </Button>
                     </div>
                 </form>

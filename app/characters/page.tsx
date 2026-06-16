@@ -8,6 +8,12 @@ export default async function CharactersPage() {
         where: { worldId: world.id },
         include: {
             story: true,
+            birthplace: {
+                select: {
+                    id: true,
+                    name: true
+                }
+            },
             relationships: {
                 include: {
                     target: {
@@ -49,11 +55,27 @@ export default async function CharactersPage() {
                             calendar: true
                         }
                     },
-                    chapter: true
+                    chapter: true,
+                    birthplace: {
+                        select: {
+                            id: true,
+                            name: true
+                        }
+                    }
                 },
                 orderBy: { createdAt: 'asc' }
             }
         },
+        orderBy: { name: 'asc' }
+    });
+
+    const locations = await prisma.location.findMany({
+        where: { worldId: world.id },
+        orderBy: { name: 'asc' }
+    });
+
+    const calendars = await prisma.calendar.findMany({
+        where: { worldId: world.id },
         orderBy: { name: 'asc' }
     });
 
@@ -82,6 +104,8 @@ export default async function CharactersPage() {
             stories={stories}
             events={events as any}
             chapters={chapters}
+            locations={locations}
+            calendars={calendars}
         />
     );
 }
