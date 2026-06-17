@@ -1,37 +1,39 @@
 import { StoryCard } from "@/app/components/ui/StoryCard";
 import { Button } from "@/components/ui/button";
-import { Plus, BookOpen, Clock, Feather, ArrowRight, Zap } from "lucide-react";
+import { Plus, BookOpen, Clock, Feather, ArrowRight, Zap, Check, Book, Users, Calendar } from "lucide-react";
 import Link from "next/link";
 import {
   Card,
-} from "@/components/ui/card"
+  CardContent,
+  CardFooter,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { getOrCreateDefaultWorld, getStories } from "@/lib/actions";
 import { getSession } from "@/lib/auth";
-
-const inspirationLines = [
-  "Follow the sentence that feels alive today.",
-  "Give one scene a sharper secret.",
-  "Let the quiet character make the loudest choice.",
-  "Write the door before you decide what waits behind it.",
-  "A small detail can carry an entire world.",
-  "Start with the trouble, then give it a name.",
-  "Make the next paragraph earn its place.",
-  "The draft only needs to move forward today.",
-];
-
-function getRandomInspirationLine() {
-  const values = new Uint32Array(1);
-  crypto.getRandomValues(values);
-  return inspirationLines[values[0] % inspirationLines.length];
-}
+import { prisma } from "@/lib/db";
+import { cn } from "@/lib/utils";
 
 export default async function Home() {
   const world = await getOrCreateDefaultWorld();
   const stories = await getStories(world.id);
   const session = await getSession();
   const username = session?.user?.username || "Writer";
-  const inspirationLine = getRandomInspirationLine();
   const renderTime = new Date();
+
+  const [characterCount, locationCount, eventCount] = await Promise.all([
+    prisma.character.count({ where: { worldId: world.id } }),
+    prisma.location.count({ where: { worldId: world.id } }),
+    prisma.timelineEvent.count({ where: { worldId: world.id } }),
+  ]);
+
+  const completionRate = Math.round(
+    (((stories.length > 0 ? 1 : 0) +
+      (characterCount > 0 ? 1 : 0) +
+      (locationCount > 0 ? 1 : 0) +
+      (eventCount > 0 ? 1 : 0)) /
+      4) *
+      100
+  );
 
   const totalWords = stories.reduce((acc, story) => acc + story.wordCount, 0);
   const activeProjects = stories.filter(s => s.status !== 'Completed').length;
@@ -48,9 +50,9 @@ export default async function Home() {
   }
 
   return (
-    <div className="p-8 space-y-8 max-w-7xl mx-auto">
+    <div className="p-8 space-y-5 max-w-7xl mx-auto">
       {/* Hero Banner */}
-      <div className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 via-accent/5 to-transparent px-6 py-5 md:px-8 md:py-6 shadow-sm">
+      <div className="relative pb-4 border-b">
         <div className="relative z-10 flex flex-col md:flex-row md:items-stretch justify-between gap-3 md:gap-6">
 
           {/* Left: greeting + stats */}
@@ -58,8 +60,8 @@ export default async function Home() {
             <h1 className="text-3xl font-bold font-serif text-foreground mt-1">
               Good morning, {username}.
             </h1>
-            <p className="text-sm text-foreground/65 leading-relaxed italic font-body max-w-sm">
-              {inspirationLine}
+            <p className="text-xs md:text-sm text-foreground/65 leading-relaxed font-body max-w-xl">
+              Currently mapping <strong className="text-foreground font-semibold font-serif">{characterCount}</strong> character{characterCount === 1 ? "" : "s"}, <strong className="text-foreground font-semibold font-serif">{locationCount}</strong> location{locationCount === 1 ? "" : "s"}, and <strong className="text-foreground font-semibold font-serif">{eventCount}</strong> timeline event{eventCount === 1 ? "" : "s"} in <span className="text-primary font-semibold font-serif">{world.name}</span>.
             </p>
             <div className="flex flex-col gap-1 pt-0.5 md:pt-1 text-xs font-semibold text-foreground/70 font-body">
               <span className="flex items-center gap-1.5">Words Written: <strong className="text-foreground font-serif">{totalWords.toLocaleString()}</strong></span>
@@ -68,7 +70,7 @@ export default async function Home() {
           </div>
 
           {/* Right: last edited + quick actions */}
-          <div className="flex flex-col gap-2 md:gap-2.5 md:min-w-[220px] md:max-w-[240px] md:border-l md:border-primary/15 md:pl-5 justify-center">
+          <div className="flex flex-col gap-2 md:gap-2.5 md:min-w-[220px] md:max-w-[240px] md:border-l md:border-border md:pl-5 justify-center">
             {lastEdited ? (
               <div className="space-y-1">
                 <p className="text-[10px] font-bold tracking-widest text-primary/50 uppercase">Last Edited</p>
@@ -107,7 +109,6 @@ export default async function Home() {
               </Link>
             </div>
           </div>
-
         </div>
       </div>
 
@@ -122,7 +123,98 @@ export default async function Home() {
 
         {stories.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {stories.map(story => (
+            {/* Universe Progress Onboarding Checklist */}
+            {stories.length < 3 && (
+              <Link href="/world" className="h-full block">
+                <Card className="group overflow-hidden hover:shadow-lg hover:shadow-primary/10 hover:border-primary/30 transition-all duration-300 hover:-translate-y-1 border-border bg-card flex flex-col h-full py-0 gap-0">
+                  <div className="relative h-44 w-full bg-gradient-to-br from-primary/30 to-purple-600/10 overflow-hidden border-b border-border flex flex-col items-center justify-center">
+                    <div className="absolute top-2 right-2">
+                      <Badge variant="secondary" className="backdrop-blur-sm bg-background/80 text-foreground border border-border/40 text-xs px-2 py-0.5">
+                        Setup
+                      </Badge>
+                    </div>
+
+                    <div className="relative flex items-center justify-center">
+                      <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 96 96">
+                        <circle
+                          cx="48"
+                          cy="48"
+                          r="38"
+                          stroke="currentColor"
+                          strokeWidth="8"
+                          fill="transparent"
+                          className="text-secondary/20"
+                        />
+                        <circle
+                          cx="48"
+                          cy="48"
+                          r="38"
+                          stroke="currentColor"
+                          strokeWidth="8"
+                          fill="transparent"
+                          strokeDasharray={2 * Math.PI * 38}
+                          strokeDashoffset={2 * Math.PI * 38 * (1 - completionRate / 100)}
+                          className="text-primary transition-all duration-500"
+                        />
+                      </svg>
+                      <div className="absolute flex flex-col items-center justify-center">
+                        <span className="text-xl font-bold font-serif text-foreground">{completionRate}%</span>
+                      </div>
+                    </div>
+
+                    <div className="absolute bottom-2 left-2">
+                      <Badge variant="outline" className="text-foreground border-border bg-background/80 backdrop-blur-sm text-xs px-2 py-0.5">
+                        Universe Progress
+                      </Badge>
+                    </div>
+                  </div>
+
+                  <CardContent className="p-4 pt-3 pb-3 flex-1 flex flex-col justify-start gap-2.5">
+                    <h3 className="text-sm font-bold text-foreground group-hover:text-primary transition-colors leading-snug font-serif">
+                      Complete these steps to outline your world.
+                    </h3>
+                    <ul className="space-y-2">
+                      <li className="flex items-center gap-2.5 text-xs">
+                        <div className={cn("h-4 w-4 rounded-full flex items-center justify-center border shrink-0", stories.length > 0 ? "border-primary bg-primary/20 text-primary" : "border-muted-foreground/30")}>
+                          {stories.length > 0 && <Check className="h-2 w-2 stroke-[3]" />}
+                        </div>
+                        <span className={cn("font-medium text-xs", stories.length > 0 ? "text-foreground/50 line-through" : "text-foreground/85")}>Create your first Story</span>
+                      </li>
+                      <li className="flex items-center gap-2.5 text-xs">
+                        <div className={cn("h-4 w-4 rounded-full flex items-center justify-center border shrink-0", characterCount > 0 ? "border-primary bg-primary/20 text-primary" : "border-muted-foreground/30")}>
+                          {characterCount > 0 && <Check className="h-2 w-2 stroke-[3]" />}
+                        </div>
+                        <span className={cn("font-medium text-xs", characterCount > 0 ? "text-foreground/50 line-through" : "text-foreground/85")}>Add a Character</span>
+                      </li>
+                      <li className="flex items-center gap-2.5 text-xs">
+                        <div className={cn("h-4 w-4 rounded-full flex items-center justify-center border shrink-0", locationCount > 0 ? "border-primary bg-primary/20 text-primary" : "border-muted-foreground/30")}>
+                          {locationCount > 0 && <Check className="h-2 w-2 stroke-[3]" />}
+                        </div>
+                        <span className={cn("font-medium text-xs", locationCount > 0 ? "text-foreground/50 line-through" : "text-foreground/85")}>Map a Location</span>
+                      </li>
+                      <li className="flex items-center gap-2.5 text-xs">
+                        <div className={cn("h-4 w-4 rounded-full flex items-center justify-center border shrink-0", eventCount > 0 ? "border-primary bg-primary/20 text-primary" : "border-muted-foreground/30")}>
+                          {eventCount > 0 && <Check className="h-2 w-2 stroke-[3]" />}
+                        </div>
+                        <span className={cn("font-medium text-xs", eventCount > 0 ? "text-foreground/50 line-through" : "text-foreground/85")}>Create a Timeline Event</span>
+                      </li>
+                    </ul>
+                  </CardContent>
+
+                  <CardFooter className="p-4 pt-0 flex flex-col gap-2 items-stretch mt-auto">
+                    <div className="flex items-center justify-between border-t border-border/60 pt-2.5 text-xs text-muted-foreground/80 font-bold tracking-tight">
+                      <span className="flex items-center gap-1.5"><Book size={13} className="text-primary/70" /> {stories.length} {stories.length === 1 ? "story" : "stories"}</span>
+                      <span className="flex items-center gap-1.5"><Users size={13} className="text-primary/70" /> {characterCount} char{characterCount === 1 ? "" : "s"}</span>
+                      <span className="flex items-center gap-1.5">
+                        <Calendar size={13} className="text-primary/70" /> {eventCount} event{eventCount === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                  </CardFooter>
+                </Card>
+              </Link>
+            )}
+
+            {[...stories].reverse().map(story => (
               <StoryCard key={story.id} story={story} />
             ))}
 

@@ -60,7 +60,7 @@ export default async function WorldPage() {
             initialLores={lores}
             initialSystems={systems}
             initialObjects={objects}
-            worldId={world.id}
+            world={{ id: world.id, name: world.name, description: world.description }}
             stories={stories}
             calendars={calendars}
         />

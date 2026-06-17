@@ -31,6 +31,14 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         notFound();
     }
 
+    const world = await prisma.world.findUnique({
+        where: { id: story.worldId }
+    });
+
+    if (!world) {
+        notFound();
+    }
+
     const calendars = await getCalendars(story.worldId);
 
     const characters = await prisma.character.findMany({
@@ -151,8 +159,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                 </div>
 
                 <div className="flex flex-col gap-3 sm:gap-5 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="grid min-w-0 grid-cols-[6rem_minmax(0,1fr)] gap-2 sm:flex sm:items-start sm:gap-6">
-                        <div className="h-36 w-24 shrink-0 overflow-hidden rounded-lg bg-muted shadow-md border group relative transition-transform active:scale-[0.98] sm:h-32 sm:w-24">
+                    <div className="flex min-w-0 items-stretch gap-4 sm:gap-6">
+                        <div className="w-24 sm:w-28 shrink-0 overflow-hidden rounded-lg bg-muted shadow-md border group relative transition-transform active:scale-[0.98]">
                             <img
                                 src={story.coverImage || "https://images.unsplash.com/photo-1543004218-ee141104975e?q=80&w=1974&auto=format&fit=crop"}
                                 alt={story.title}
@@ -165,47 +173,44 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                             )}
                             <Badge
                                 variant={story.status === 'Completed' ? 'default' : 'secondary'}
-                                className="absolute right-1.5 top-1.5 px-2 py-0.5 text-[10px] shadow-sm sm:hidden"
+                                className="absolute right-1.5 top-1.5 px-2 py-0.5 text-[10px] shadow-sm"
                             >
                                 {story.status}
                             </Badge>
                         </div>
 
-                        <div className="min-w-0 self-start">
+                        <div className="min-w-0 flex-1 flex flex-col justify-between py-0.5">
                             <div className="flex min-w-0 flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-3">
                                 <h1 className="max-w-full break-words text-2xl font-bold text-foreground tracking-tight leading-tight sm:text-3xl">{story.title}</h1>
-                                <Badge variant={story.status === 'Completed' ? 'default' : 'secondary'} className="hidden px-2.5 py-0.5 shrink-0 sm:inline-flex">
-                                    {story.status}
-                                </Badge>
                             </div>
 
                             {story.synopsis && (
-                                <div className="mt-2 max-w-2xl sm:mt-3">
-                                    <p className="break-words text-sm text-muted-foreground/90 leading-relaxed sm:line-clamp-2 sm:hover:line-clamp-none transition-all cursor-pointer italic">
-                                        &ldquo;{story.synopsis}&rdquo;
+                                <div className="mt-1 max-w-2xl">
+                                    <p className="break-words text-sm text-muted-foreground/90 leading-relaxed line-clamp-2">
+                                        {story.synopsis}
                                     </p>
                                 </div>
                             )}
 
-                            <div className="mt-2 flex flex-wrap gap-1.5 sm:mt-3 sm:gap-2">
+                            <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
                                 {story.tags.length > 0 ? (
                                     story.tags.map(tag => (
-                                        <Badge key={tag} variant="outline" className="max-w-full break-all bg-secondary/30 border-secondary/50 text-xs font-normal">
+                                        <span key={tag} className="text-xs font-medium text-muted-foreground">
                                             #{tag}
-                                        </Badge>
+                                        </span>
                                     ))
                                 ) : (
                                     <span className="text-xs text-muted-foreground italic">No tags added</span>
                                 )}
                             </div>
 
-                            <div className="mt-2 flex flex-col gap-1 text-sm text-muted-foreground sm:mt-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6 sm:gap-y-2">
-                                <div className="flex items-center gap-1.5 hover:text-foreground transition-colors cursor-default">
-                                    <FileText className="h-4 w-4 shrink-0" />
+                            <div className="mt-1.5 flex flex-col gap-1 text-xs text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-1">
+                                <div className="flex items-center gap-1 hover:text-foreground transition-colors cursor-default">
+                                    <FileText className="h-3.5 w-3.5 shrink-0" />
                                     <span className="break-words">{story.wordCount.toLocaleString()} words</span>
                                 </div>
-                                <div className="flex items-center gap-1.5 hover:text-foreground transition-colors cursor-default">
-                                    <Clock className="h-4 w-4 shrink-0" />
+                                <div className="flex items-center gap-1 hover:text-foreground transition-colors cursor-default">
+                                    <Clock className="h-3.5 w-3.5 shrink-0" />
                                     <span className="break-words">Last edited {formatRelativeTime(story.lastEdited)}</span>
                                 </div>
                             </div>
@@ -213,13 +218,13 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                     </div>
 
 
-                    <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
-                        <StorySettings story={story} />
-                        <Link href={`/stories/${id}/editor/new`} className="w-full sm:w-auto">
-                            <Button size="sm" className="w-full shadow-sm active:scale-[0.98] sm:w-auto">
+                    <div className="flex flex-col gap-3 w-full sm:w-40 shrink-0">
+                        <Link href={`/stories/${id}/editor/new`} className="w-full">
+                            <Button size="sm" className="w-full shadow-sm active:scale-[0.98]">
                                 <Plus className="mr-2 h-4 w-4" /> New Chapter
                             </Button>
                         </Link>
+                        <StorySettings story={story} className="w-full shadow-sm active:scale-[0.98]" />
                     </div>
                 </div>
             </div>
@@ -268,7 +273,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                 </div>
 
                 <div className="flex-1 bg-muted/30">
-                    <TabsContent value="overview" className="m-0 p-4 sm:p-8">
+                    <TabsContent value="overview" className="m-0 p-4 sm:py-5 sm:px-8">
                         <div className="w-full space-y-8">
                             {/* Chapters Section */}
                             <section>
@@ -310,13 +315,13 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                             initialLores={lores}
                             initialSystems={systems}
                             initialObjects={objects}
-                            worldId={story.worldId}
+                            world={{ id: world.id, name: world.name, description: world.description }}
                             storyId={id}
                             stories={[story]}
                             calendars={calendars}
                         />
                     </TabsContent>
-                    <TabsContent value="timeline" className="m-0 p-4 sm:p-8">
+                    <TabsContent value="timeline" className="m-0 p-4 sm:py-5 sm:px-8">
                         <div className="max-w-5xl mx-auto">
                             <CalendarWidget
                                 chapters={story.chapters}
@@ -325,7 +330,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                             />
                         </div>
                     </TabsContent>
-                    <TabsContent value="notes" className="m-0 p-4 sm:p-8">
+                    <TabsContent value="notes" className="m-0 p-4 sm:py-5 sm:px-8">
                         <NotesVaultClient notes={(story as any).notes || []} storyId={story.id} />
                     </TabsContent>
                 </div>

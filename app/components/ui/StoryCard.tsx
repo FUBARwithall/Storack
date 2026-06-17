@@ -52,13 +52,13 @@ export function StoryCard({ story, className }: StoryCardProps) {
                 </div>
 
                 <CardContent className="p-4 pt-3 pb-3 flex-1 flex flex-col justify-start">
-                    <h3 className="mb-1 text-base font-bold text-foreground group-hover:text-primary transition-colors leading-snug font-serif">
+                    <h3 className="mb-1.5 text-base font-bold text-foreground group-hover:text-primary transition-colors leading-snug font-serif">
                         {story.title}
                     </h3>
 
                     {story.synopsis && (
-                        <p className="line-clamp-1 text-sm text-muted-foreground leading-normal font-body italic">
-                            "{story.synopsis}"
+                        <p className="line-clamp-5 text-xs text-muted-foreground leading-normal font-body">
+                            {story.synopsis}
                         </p>
                     )}
                 </CardContent>

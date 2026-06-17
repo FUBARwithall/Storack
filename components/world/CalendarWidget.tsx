@@ -3,12 +3,12 @@
 import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CalendarEngine, CustomDate, DEFAULT_CALENDAR, CalendarConfig, MonthConfig, WeekDayConfig, RecurringEvent } from "@/lib/calendar-engine";
-import { Calendar as CalendarIcon, Clock, ChevronLeft, ChevronRight, Plus, Trash, Settings, Save, X, Snowflake, Sun } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, ChevronLeft, ChevronRight, Plus, Trash, Settings, Save, X, Snowflake, Sun, Pencil } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
-import { createCalendar, createEvent, getEvents, deleteCalendar, updateChapterDates, deleteEvent } from "@/lib/actions";
+import { createCalendar, createEvent, getEvents, deleteCalendar, updateChapterDates, deleteEvent, updateEvent } from "@/lib/actions";
 import { useEffect } from "react";
 
 const FANTASY_CALENDAR: CalendarConfig = {
@@ -134,6 +134,7 @@ export function CalendarWidget({ chapters = [], worldId, initialCalendars = [] }
     const [newEventDescription, setNewEventDescription] = useState('');
     const [newEventDuration, setNewEventDuration] = useState('1');
     const [selectedChapterId, setSelectedChapterId] = useState<string>('none');
+    const [editingEventId, setEditingEventId] = useState<string | null>(null);
 
     // Calendar Engine Instance
     const engine = selectedCalendar ? new CalendarEngine(selectedCalendar) : null;
@@ -277,6 +278,61 @@ export function CalendarWidget({ chapters = [], worldId, initialCalendars = [] }
         }
     };
 
+    const handleStartEditEvent = (event: TimelineEvent) => {
+        setEditingEventId(event.id);
+        setNewEventTitle(event.title);
+        setNewEventDescription(event.description || '');
+        setNewEventDuration(String(event.duration));
+        setSelectedChapterId(event.chapterId || 'none');
+        setCurrentDate(event.startDate);
+    };
+
+    const handleCancelEditEvent = () => {
+        setEditingEventId(null);
+        setNewEventTitle('');
+        setNewEventDescription('');
+        setNewEventDuration('1');
+        setSelectedChapterId('none');
+    };
+
+    const handleUpdateEvent = async () => {
+        if (!editingEventId || !newEventTitle || !selectedCalendarId || !engine) return;
+
+        const start = { ...currentDate };
+        const duration = parseInt(newEventDuration) || 1;
+
+        const startAbs = engine.dateToAbsoluteDays(start);
+        const endAbs = startAbs + duration;
+        const end = engine.absoluteDaysToDate(endAbs);
+
+        const eventPayload = {
+            title: newEventTitle,
+            description: newEventDescription,
+            startDate: start,
+            endDate: end,
+            duration: duration,
+            chapterId: selectedChapterId
+        };
+
+        try {
+            await updateEvent(selectedCalendarId, worldId, editingEventId, eventPayload);
+
+            setEvents(prev => prev.map(e => e.id === editingEventId ? {
+                ...e,
+                title: newEventTitle,
+                description: newEventDescription || undefined,
+                startDate: start,
+                endDate: end,
+                duration: duration,
+                chapterId: selectedChapterId === 'none' ? undefined : selectedChapterId
+            } : e));
+
+            handleCancelEditEvent();
+        } catch (e) {
+            console.error("Failed to update event", e);
+        }
+    };
+
     const handleDeleteEvent = async (eventId: string) => {
         if (!confirm('Remove this event from the chronicle?')) return;
         try {
@@ -288,13 +344,13 @@ export function CalendarWidget({ chapters = [], worldId, initialCalendars = [] }
     };
 
     return (
-        <Card className="w-full">
-            <CardHeader className="pb-3">
+        <div className="w-full space-y-6">
+            <div className="flex flex-col gap-1">
                 <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg flex items-center gap-2">
+                    <h2 className="text-lg font-bold flex items-center gap-2">
                         <Clock className="h-5 w-5 text-indigo-500" />
                         Timeline Manager
-                    </CardTitle>
+                    </h2>
                     {viewMode === 'timeline' && (
                         <div className="flex items-center gap-2">
                             <Select value={selectedCalendarId || "none"} onValueChange={handleCalendarChange}>
@@ -329,13 +385,13 @@ export function CalendarWidget({ chapters = [], worldId, initialCalendars = [] }
                         </div>
                     )}
                 </div>
-                <CardDescription>
+                <p className="text-sm text-muted-foreground">
                     {viewMode === 'create'
                         ? "Design a custom calendar system for your world."
                         : "Manage your world's date and chronicle history."}
-                </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
+                </p>
+            </div>
+            <div className="space-y-6">
 
                 {viewMode === 'create' ? (
                     <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
@@ -568,8 +624,9 @@ export function CalendarWidget({ chapters = [], worldId, initialCalendars = [] }
                             </div>
                         ) : (
                             <>
+                                <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start w-full mb-6">
                                 {/* Date Navigation & Calendar Grid */}
-                                <div className="flex flex-col gap-4 py-4 bg-card/40 rounded-xl border shadow-sm max-w-sm mx-auto w-full">
+                                <div className="flex flex-col gap-4 py-4 bg-card/40 rounded-xl border shadow-sm max-w-sm mx-auto w-full md:col-span-5">
                                     {/* Header Controls */}
                                     <div className="flex items-center justify-between px-4">
                                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
@@ -704,10 +761,10 @@ export function CalendarWidget({ chapters = [], worldId, initialCalendars = [] }
                                     </div>
                                 </div>
 
-                                {/* Add Event Section */}
-                                <div className="rounded-lg border p-4 bg-card/50">
+                                {/* Add/Edit Event Section */}
+                                <div className="pt-1.5 pb-4 md:col-span-7">
                                     <h4 className="text-sm font-semibold flex items-center gap-2 mb-3">
-                                        <CalendarIcon className="h-4 w-4" /> Log New Event
+                                        <CalendarIcon className="h-4 w-4" /> {editingEventId ? "Edit Event" : "Log New Event"}
                                     </h4>
 
                                     <div className="flex flex-col gap-3">
@@ -718,11 +775,11 @@ export function CalendarWidget({ chapters = [], worldId, initialCalendars = [] }
                                             className="h-9"
                                         />
 
-                                        <Input
+                                        <Textarea
                                             value={newEventDescription}
                                             onChange={(e) => setNewEventDescription(e.target.value)}
                                             placeholder="Short description..."
-                                            className="h-9"
+                                            className="min-h-[145px] resize-none"
                                         />
 
                                         {/* Days + Chapter Row */}
@@ -755,21 +812,43 @@ export function CalendarWidget({ chapters = [], worldId, initialCalendars = [] }
                                             </Select>
                                         </div>
 
-                                        <Button
-                                            onClick={handleAddEvent}
-                                            size="sm"
-                                            className="w-full h-9"
-                                            disabled={!newEventTitle}
-                                        >
-                                            Add to Timeline
-                                        </Button>
+                                        {editingEventId ? (
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    onClick={handleCancelEditEvent}
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="flex-1 h-9"
+                                                >
+                                                    Cancel
+                                                </Button>
+                                                <Button
+                                                    onClick={handleUpdateEvent}
+                                                    size="sm"
+                                                    className="flex-1 h-9"
+                                                    disabled={!newEventTitle}
+                                                >
+                                                    Save Changes
+                                                </Button>
+                                            </div>
+                                        ) : (
+                                            <Button
+                                                onClick={handleAddEvent}
+                                                size="sm"
+                                                className="w-full h-9"
+                                                disabled={!newEventTitle}
+                                            >
+                                                Add to Timeline
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
+                            </div>
 
-                                {/* Timeline & Roadmap Grid */}
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 border-t border-dashed pt-6">
-                                    {/* Left: Chronicle (Events) */}
-                                    <div className="space-y-4">
+                                 {/* Timeline & Roadmap Grid */}
+                                 <div className="grid grid-cols-1 lg:grid-cols-10 gap-8 border-t border-dashed pt-6">
+                                     {/* Left: Chronicle (Events) */}
+                                     <div className="lg:col-span-7 space-y-4">
                                         <h3 className="text-sm font-semibold flex items-center gap-2">
                                             <div className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
                                             Chronicle
@@ -788,21 +867,29 @@ export function CalendarWidget({ chapters = [], worldId, initialCalendars = [] }
                                                                     <div className="flex items-center gap-2 flex-wrap">
                                                                         <span className="text-xs font-mono text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/30 px-1.5 py-0.5 rounded">
                                                                             {engine.formatDate(event.startDate)}
+                                                                            {event.duration > 1 && ` — ${engine.formatDate(event.endDate)}`}
                                                                         </span>
-                                                                        {event.duration > 1 && (
-                                                                            <span className="text-[10px] text-muted-foreground">
-                                                                                — ends {engine.formatDate(event.endDate)}
-                                                                            </span>
-                                                                        )}
                                                                     </div>
-                                                                    <Button
-                                                                        onClick={() => handleDeleteEvent(event.id)}
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded shrink-0"
-                                                                    >
-                                                                        <Trash className="h-3.5 w-3.5" />
-                                                                    </Button>
+                                                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                                                        <Button
+                                                                            onClick={() => handleStartEditEvent(event)}
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-accent rounded"
+                                                                            title="Edit event"
+                                                                        >
+                                                                            <Pencil className="h-3.5 w-3.5" />
+                                                                        </Button>
+                                                                        <Button
+                                                                            onClick={() => handleDeleteEvent(event.id)}
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded"
+                                                                            title="Delete event"
+                                                                        >
+                                                                            <Trash className="h-3.5 w-3.5" />
+                                                                        </Button>
+                                                                    </div>
                                                                 </div>
 
                                                                 <div className="flex items-center gap-2">
@@ -815,7 +902,7 @@ export function CalendarWidget({ chapters = [], worldId, initialCalendars = [] }
                                                                 </div>
 
                                                                 {event.description && (
-                                                                    <p className="text-xs text-muted-foreground/90 leading-relaxed">
+                                                                    <p className="text-xs text-muted-foreground/90 leading-relaxed line-clamp-3">
                                                                         {event.description}
                                                                     </p>
                                                                 )}
@@ -831,8 +918,8 @@ export function CalendarWidget({ chapters = [], worldId, initialCalendars = [] }
                                         )}
                                     </div>
 
-                                    {/* Right: Story Roadmap (Chapters) */}
-                                    <div className="space-y-4">
+                                     {/* Right: Story Roadmap (Chapters) */}
+                                     <div className="lg:col-span-3 space-y-4">
                                         <h3 className="text-sm font-semibold flex items-center gap-2">
                                             <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                                             Story Roadmap
@@ -854,37 +941,38 @@ export function CalendarWidget({ chapters = [], worldId, initialCalendars = [] }
                                                     return (
                                                         <div className="relative border-l-2 border-emerald-100 dark:border-emerald-900/50 ml-3 space-y-6 pb-2">
                                                             {roadmapItems.map((item) => (
-                                                                <div key={`${item.id}-${item.dateIndex}`} className="relative pl-6">
+                                                                <div key={`${item.id}-${item.dateIndex}`} className="relative pl-6 group">
                                                                     {/* Roadmap Dot */}
                                                                     <div className="absolute -left-[9px] top-1 h-4 w-4 rounded-full bg-emerald-500 border-4 border-background shadow-sm" />
 
                                                                     <div className="flex items-start justify-between gap-2">
-                                                                        <div className="space-y-1">
+                                                                        <div className="space-y-1 min-w-0">
                                                                             <div className="flex items-center gap-2">
-                                                                                <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/30 px-1.5 py-0.5 rounded">
+                                                                                <span className="text-xs font-mono text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/30 px-1.5 py-0.5 rounded">
                                                                                     {engine.formatDate(item.activeDate)}
                                                                                 </span>
                                                                             </div>
-                                                                            <h4 className="font-semibold text-foreground text-sm">Ch {item.order}: {item.title}</h4>
+                                                                            <h4 className="font-semibold text-foreground text-sm truncate" title={`Ch ${item.order}: ${item.title}`}>Ch {item.order}: {item.title}</h4>
                                                                         </div>
 
-                                                                        <div className="flex items-center gap-1">
+                                                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                                                                             <Button
-                                                                                size="sm"
-                                                                                variant="outline"
-                                                                                className="h-6 text-[9px] px-1.5 gap-0.5"
+                                                                                size="icon"
+                                                                                variant="ghost"
+                                                                                className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-accent rounded"
                                                                                 onClick={() => handleAddChapterDate(item.id, currentDate)}
-                                                                                title="Add current calendar date as another occurrence"
+                                                                                title="Add current date"
                                                                             >
-                                                                                <Plus className="h-2 w-2" /> Add Date
+                                                                                <Plus className="h-3.5 w-3.5" />
                                                                             </Button>
                                                                             <Button
-                                                                                size="sm"
+                                                                                size="icon"
                                                                                 variant="ghost"
-                                                                                className="h-6 text-[10px] text-muted-foreground hover:text-red-500 hover:bg-red-500/10 px-1.5"
+                                                                                className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded"
                                                                                 onClick={() => handleRemoveChapterDate(item.id, item.dateIndex)}
+                                                                                title="Remove date"
                                                                             >
-                                                                                Remove
+                                                                                <Trash className="h-3.5 w-3.5" />
                                                                             </Button>
                                                                         </div>
                                                                     </div>
@@ -908,16 +996,19 @@ export function CalendarWidget({ chapters = [], worldId, initialCalendars = [] }
                                                 <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Unassigned Chapters</h4>
                                                 <div className="flex flex-col gap-2 max-h-[200px] overflow-y-auto pr-1">
                                                     {localChapters.filter(ch => !ch.date || ch.date.length === 0).map(ch => (
-                                                        <div key={ch.id} className="flex items-center justify-between p-2 rounded-lg border bg-card/30 text-xs">
+                                                        <div key={ch.id} className="flex items-center justify-between p-2 rounded-lg border bg-card/30 text-xs group">
                                                             <span className="font-medium truncate">Ch {ch.order}: {ch.title}</span>
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline"
-                                                                className="h-6 text-[9px] gap-1 px-2"
-                                                                onClick={() => handleAddChapterDate(ch.id, currentDate)}
-                                                            >
-                                                                <Plus className="h-2.5 w-2.5" /> Set Date
-                                                            </Button>
+                                                            <div className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                                                <Button
+                                                                    size="icon"
+                                                                    variant="ghost"
+                                                                    className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-accent rounded"
+                                                                    onClick={() => handleAddChapterDate(ch.id, currentDate)}
+                                                                    title="Set current date"
+                                                                >
+                                                                    <Plus className="h-3.5 w-3.5" />
+                                                                </Button>
+                                                            </div>
                                                         </div>
                                                     ))}
                                                 </div>
@@ -929,7 +1020,7 @@ export function CalendarWidget({ chapters = [], worldId, initialCalendars = [] }
                         )}
                     </>
                 )}
-            </CardContent>
-        </Card>
+            </div>
+        </div>
     );
 }

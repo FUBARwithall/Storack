@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/db";
 import { Prisma } from "@/lib/generated/prisma";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { CalendarConfig, CustomDate, DEFAULT_CALENDAR } from "./calendar-engine";
 import { requireUserId } from "./auth";
 import cloudinary from "@/lib/cloudinary";
@@ -115,20 +116,79 @@ async function requireOwnedLocation(locationId: string) {
 // --- World ---
 export async function getOrCreateDefaultWorld() {
     const finalUserId = await requireUserId();
+    const cookieStore = await cookies();
+    const activeWorldId = cookieStore.get("active_world_id")?.value;
 
-    const world = await prisma.world.findFirst({
+    if (activeWorldId) {
+        const world = await prisma.world.findFirst({
+            where: { id: activeWorldId, userId: finalUserId },
+        });
+        if (world) return world;
+    }
+
+    let world = await prisma.world.findFirst({
         where: { userId: finalUserId },
     });
 
-    if (world) return world;
+    if (!world) {
+        world = await prisma.world.create({
+            data: {
+                name: "My World",
+                description: "A world created for you.",
+                userId: finalUserId,
+            },
+        });
+    }
 
-    return await prisma.world.create({
+    return world;
+}
+
+export async function getWorlds() {
+    const userId = await requireUserId();
+    return await prisma.world.findMany({
+        where: { userId },
+        orderBy: { updatedAt: "desc" },
+    });
+}
+
+export async function createWorld(data: { name: string; description?: string }) {
+    const userId = await requireUserId();
+    const world = await prisma.world.create({
         data: {
-            name: "My World",
-            description: "A world created for you.",
-            userId: finalUserId,
+            name: data.name,
+            description: data.description,
+            userId,
         },
     });
+
+    const cookieStore = await cookies();
+    cookieStore.set("active_world_id", world.id, {
+        path: "/",
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+    });
+
+    revalidatePath("/");
+    revalidatePath("/world");
+    return world;
+}
+
+export async function updateWorld(id: string, data: Partial<{ name: string; description: string }>) {
+    const userId = await requireUserId();
+    const world = await prisma.world.findFirst({
+        where: { id, userId },
+    });
+    if (!world) throw new Error("World not found");
+
+    const updated = await prisma.world.update({
+        where: { id },
+        data,
+    });
+
+    revalidatePath("/");
+    revalidatePath("/world");
+    return updated;
 }
 
 // --- Calendars ---
@@ -293,6 +353,35 @@ export async function deleteEvent(eventId: string) {
     await prisma.timelineEvent.delete({ where: { id: eventId } });
     revalidatePath("/world");
 }
+
+export async function updateEvent(calendarId: string, worldId: string, eventId: string, event: { title: string, description?: string, startDate: CustomDate, endDate: CustomDate, duration: number, chapterId?: string }) {
+    const [calendar, world] = await Promise.all([
+        requireOwnedCalendar(calendarId),
+        requireOwnedWorld(worldId),
+    ]);
+
+    if (calendar.worldId !== world.id) throw new Error("Not found");
+
+    if (event.chapterId && event.chapterId !== "none") {
+        const chapter = await requireOwnedChapter(event.chapterId);
+        if (chapter.worldId !== world.id) throw new Error("Not found");
+    }
+
+    const updatedEvent = await prisma.timelineEvent.update({
+        where: { id: eventId },
+        data: {
+            title: event.title,
+            description: event.description,
+            startDate: event.startDate as unknown as Prisma.InputJsonValue,
+            endDate: event.endDate as unknown as Prisma.InputJsonValue,
+            duration: event.duration,
+            chapterId: event.chapterId === 'none' ? null : event.chapterId
+        }
+    });
+    revalidatePath("/world");
+    return updatedEvent;
+}
+
 
 // --- Stories ---
 export async function getStories(worldId: string) {

@@ -22,7 +22,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Settings, Loader2, Image as ImageIcon, Upload } from "lucide-react";
-import { updateStory, uploadStoryCover } from "@/lib/actions";
+import { updateStory, uploadStoryCover, deleteStory } from "@/lib/actions";
 import { useRouter } from "next/navigation";
 import { useRef } from "react";
 
@@ -36,6 +36,7 @@ interface StorySettingsProps {
         coverImage: string | null;
         tags: string[];
     };
+    className?: string;
 }
 
 const GENRE_LIST = [
@@ -54,7 +55,7 @@ const GENRE_LIST = [
     "Other"
 ];
 
-export function StorySettings({ story }: StorySettingsProps) {
+export function StorySettings({ story, className }: StorySettingsProps) {
     const [open, setOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
@@ -123,11 +124,28 @@ export function StorySettings({ story }: StorySettingsProps) {
         }
     }
 
+    async function handleDelete() {
+        if (!confirm("Are you sure you want to delete this story? This will permanently delete all chapters, characters, notes, and other content associated with this story. This action cannot be undone.")) {
+            return;
+        }
+        setIsLoading(true);
+        try {
+            await deleteStory(story.id);
+            setOpen(false);
+            router.push("/");
+        } catch (error) {
+            console.error(error);
+            alert("Failed to delete story");
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" className={className}>
                     <Settings className="mr-2 h-4 w-4" /> Settings
                 </Button>
             </DialogTrigger>
@@ -273,14 +291,25 @@ export function StorySettings({ story }: StorySettingsProps) {
                             />
                         </div>
                     </div>
-                    <DialogFooter className="bg-muted/30 -mx-6 -mb-6 p-6 rounded-b-lg border-t mt-4">
-                        <Button type="button" variant="ghost" onClick={() => setOpen(false)} className="hover:bg-muted font-medium">
-                            Cancel
+                    <DialogFooter className="bg-muted/30 -mx-6 -mb-6 p-6 rounded-b-lg border-t mt-4 sm:justify-between flex-col-reverse sm:flex-row gap-2">
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            onClick={handleDelete}
+                            disabled={isLoading}
+                            className="bg-destructive hover:bg-destructive/90 text-destructive-foreground font-medium w-full sm:w-auto"
+                        >
+                            Delete Story
                         </Button>
-                        <Button type="submit" disabled={isLoading} className="shadow-md hover:shadow-lg transition-all px-6">
-                            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Save Story Settings
-                        </Button>
+                        <div className="flex flex-col-reverse sm:flex-row gap-2 w-full sm:w-auto">
+                            <Button type="button" variant="ghost" onClick={() => setOpen(false)} className="hover:bg-muted font-medium w-full sm:w-auto">
+                                Cancel
+                            </Button>
+                            <Button type="submit" disabled={isLoading} className="shadow-md hover:shadow-lg transition-all px-6 w-full sm:w-auto">
+                                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Save Story Settings
+                            </Button>
+                        </div>
                     </DialogFooter>
                 </form>
             </DialogContent>

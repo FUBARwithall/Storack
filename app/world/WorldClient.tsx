@@ -17,7 +17,8 @@ import {
     deleteFaction,
     deleteLore,
     deleteWorldSystem,
-    deleteWorldObject
+    deleteWorldObject,
+    updateWorld
 } from "@/lib/actions";
 import {
     DropdownMenu,
@@ -25,6 +26,17 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter
+} from "@/components/ui/dialog";
 
 interface Location {
     id: string;
@@ -59,7 +71,7 @@ interface WorldClientProps {
     initialLores?: any[];
     initialSystems?: any[];
     initialObjects?: any[];
-    worldId: string;
+    world: { id: string, name: string, description: string | null };
     storyId?: string;
     stories?: any[];
     calendars?: any[];
@@ -84,14 +96,41 @@ export function WorldClient({
     initialLores = [],
     initialSystems = [],
     initialObjects = [],
-    worldId,
+    world,
     storyId,
     stories = [],
     calendars = []
 }: WorldClientProps) {
     const router = useRouter();
+    const worldId = world.id;
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedCategory, setSelectedCategory] = useState("All");
+
+    // World edit states
+    const [isEditingWorld, setIsEditingWorld] = useState(false);
+    const [worldName, setWorldName] = useState(world.name);
+    const [worldDescription, setWorldDescription] = useState(world.description || "");
+    const [isSavingWorld, setIsSavingWorld] = useState(false);
+
+    const handleSaveWorld = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!worldName.trim()) return;
+        setIsSavingWorld(true);
+        try {
+            await updateWorld(worldId, {
+                name: worldName,
+                description: worldDescription
+            });
+            toast.success("World updated successfully");
+            setIsEditingWorld(false);
+            router.refresh();
+        } catch (error) {
+            console.error("Failed to update world:", error);
+            toast.error("Failed to update world");
+        } finally {
+            setIsSavingWorld(false);
+        }
+    };
 
     // Form states
     const [viewMode, setViewMode] = useState<'list' | 'character_form' | 'location_form' | 'faction_form' | 'lore_form' | 'system_form' | 'object_form'>('list');
@@ -410,8 +449,23 @@ export function WorldClient({
         <div className="p-6 md:p-8 space-y-6 max-w-full mx-auto">
             <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div>
-                    <h1 className="text-3xl font-extrabold tracking-tight text-foreground">Worldbuilding</h1>
-                    <p className="text-muted-foreground mt-1 text-sm">Lore, locations, and legends of your universe.</p>
+                    <div className="flex items-center gap-2">
+                        <h1 className="text-3xl font-extrabold tracking-tight text-foreground">{world.name}</h1>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-full hover:bg-primary/10 transition-colors"
+                            onClick={() => {
+                                setWorldName(world.name);
+                                setWorldDescription(world.description || "");
+                                setIsEditingWorld(true);
+                            }}
+                            title="Edit world settings"
+                        >
+                            <Pencil className="h-4 w-4" />
+                        </Button>
+                    </div>
+                    <p className="text-muted-foreground mt-1 text-sm">{world.description || "Lore, locations, and legends of your universe."}</p>
                 </div>
                 <CreateButton />
             </header>
@@ -513,6 +567,62 @@ export function WorldClient({
                         <CreateButton size="sm" align="center" />
                     </div>
                 </div>
+            )}
+
+            {isEditingWorld && (
+                <Dialog open={isEditingWorld} onOpenChange={setIsEditingWorld}>
+                    <DialogContent className="sm:max-w-[500px]">
+                        <form onSubmit={handleSaveWorld} className="space-y-4">
+                            <DialogHeader>
+                                <DialogTitle>Edit World Details</DialogTitle>
+                                <DialogDescription>
+                                    Update the name and description of your shared universe setting.
+                                </DialogDescription>
+                            </DialogHeader>
+
+                            <div className="space-y-3">
+                                <div className="space-y-1">
+                                    <Label htmlFor="world-name" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">World Name</Label>
+                                    <Input
+                                        id="world-name"
+                                        placeholder="e.g. Middle-earth"
+                                        value={worldName}
+                                        onChange={(e) => setWorldName(e.target.value)}
+                                        required
+                                        className="h-10 bg-card/50"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="world-desc" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Description</Label>
+                                    <Textarea
+                                        id="world-desc"
+                                        placeholder="A summary of the setting, themes, or rules..."
+                                        value={worldDescription}
+                                        onChange={(e) => setWorldDescription(e.target.value)}
+                                        className="bg-card/50 min-h-[100px] resize-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <DialogFooter>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setIsEditingWorld(false)}
+                                    disabled={isSavingWorld}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    disabled={isSavingWorld || !worldName.trim()}
+                                >
+                                    Save Changes
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                </Dialog>
             )}
         </div>
     );

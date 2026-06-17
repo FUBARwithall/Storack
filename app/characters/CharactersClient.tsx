@@ -698,7 +698,7 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
                                                     <h3 className="font-bold text-sm uppercase tracking-wider flex items-center gap-2 text-foreground">
                                                         <CalendarIcon className="h-4 w-4 text-primary" /> Chronology & Origins
                                                     </h3>
-                                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 bg-card/20 p-4 border border-border/30">
+                                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                                                         <div>
                                                             <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-1">Birth Date</p>
                                                             <p className="text-sm font-semibold text-foreground">{birthStr}</p>
@@ -788,7 +788,7 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
                                                                  {/* Relation Type Header */}
                                                                  <div className="pt-3 pb-2 px-3 flex items-center justify-between border-b border-border/10 relative">
                                                                      <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500 mx-auto">
-                                                                         {rel.type} <span className="opacity-60 text-[8px]">(Inbound)</span>
+                                                                         {rel.type}
                                                                      </span>
                                                                      <div className="absolute right-2 top-1.5 z-10">
                                                                          <DropdownMenu>
