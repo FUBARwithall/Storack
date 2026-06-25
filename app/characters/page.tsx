@@ -101,6 +101,7 @@ export default async function CharactersPage() {
         <CharactersClient
             initialCharacters={characters as any}
             worldId={world.id}
+            worldName={world.name}
             stories={stories}
             events={events as any}
             chapters={chapters}

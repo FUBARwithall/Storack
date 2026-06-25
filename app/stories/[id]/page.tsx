@@ -122,7 +122,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     const locations = (await prisma.location.findMany({
         where: { storyId: id },
         orderBy: { name: 'asc' }
-    })).map(loc => ({ ...loc, type: 'Location' }));
+    })).map(loc => ({ ...loc, type: loc.type || 'Location' }));
 
     const factions = await prisma.organization.findMany({
         where: { storyId: id },

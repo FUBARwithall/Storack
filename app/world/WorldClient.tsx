@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Search, Plus, Globe, MoreHorizontal, MapPin, Shield, Book, Zap, Box, User, Pencil, Trash2 } from "lucide-react";
+import { Search, Plus, Globe, MoreHorizontal, MapPin, Shield, Book, Zap, Box, User, Pencil, Trash2, ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { LocationForm } from "@/components/world/LocationForm";
 import { CharacterForm } from "@/components/characters/CharacterForm";
@@ -45,6 +45,7 @@ interface Location {
     description: string | null;
     mapUrl: string | null;
     imageUrl: string | null;
+    parentId?: string | null;
     storyId?: string | null;
     story?: { id: string, title: string } | null;
 }
@@ -77,7 +78,15 @@ interface WorldClientProps {
     calendars?: any[];
 }
 
+import LOCATION_TYPES from "@/lib/locationTypes";
+
 const TypeIcon = ({ type }: { type: string }) => {
+    // Check if it's a location type
+    const locType = LOCATION_TYPES.flatMap(g => g.items).find(i => i.value === type || i.label === type);
+    if (locType) {
+        return <locType.icon className="h-4 w-4" />;
+    }
+
     switch (type) {
         case 'Location': return <MapPin className="h-4 w-4" />;
         case 'Character': return <User className="h-4 w-4" />;
@@ -134,6 +143,16 @@ export function WorldClient({
 
     // Form states
     const [viewMode, setViewMode] = useState<'list' | 'character_form' | 'location_form' | 'faction_form' | 'lore_form' | 'system_form' | 'object_form'>('list');
+    
+    // Tree view expanded states
+    const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
+
+    const toggleNode = (nodeId: string) => {
+        setExpandedNodes(prev => ({
+            ...prev,
+            [nodeId]: prev[nodeId] === false ? true : false
+        }));
+    };
     const [editingChar, setEditingChar] = useState<any>(undefined);
     const [editingLocation, setEditingLocation] = useState<any>(undefined);
     const [editingFaction, setEditingFaction] = useState<any>(undefined);
@@ -194,7 +213,9 @@ export function WorldClient({
     const filteredItems = worldItems.filter(item => {
         const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             item.description?.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesCategory = selectedCategory === "All" || item.type === selectedCategory;
+        const matchesCategory = selectedCategory === "All" || 
+            (selectedCategory === "Location" && item.sourceType === "location") ||
+            item.type === selectedCategory;
         return matchesSearch && matchesCategory;
     });
 
@@ -340,6 +361,7 @@ export function WorldClient({
             <div className="p-6 md:p-8 w-full max-w-full mx-auto animate-in fade-in duration-500">
                 <CharacterForm
                     worldId={worldId}
+                    worldName={world.name}
                     storyId={storyId}
                     stories={stories}
                     character={editingChar}
@@ -360,8 +382,10 @@ export function WorldClient({
             <div className="p-6 md:p-8 w-full max-w-full mx-auto animate-in fade-in duration-500">
                 <LocationForm
                     worldId={worldId}
+                    worldName={world.name}
                     storyId={storyId}
                     stories={stories}
+                    locations={initialLocations}
                     entry={editingLocation}
                     onSave={() => {
                         setViewMode('list');
@@ -378,6 +402,7 @@ export function WorldClient({
             <div className="p-6 md:p-8 w-full max-w-full mx-auto animate-in fade-in duration-500">
                 <FactionForm
                     worldId={worldId}
+                    worldName={world.name}
                     storyId={storyId}
                     stories={stories}
                     entry={editingFaction}
@@ -396,6 +421,7 @@ export function WorldClient({
             <div className="p-6 md:p-8 w-full max-w-full mx-auto animate-in fade-in duration-500">
                 <LoreForm
                     worldId={worldId}
+                    worldName={world.name}
                     storyId={storyId}
                     stories={stories}
                     entry={editingLore}
@@ -414,6 +440,7 @@ export function WorldClient({
             <div className="p-6 md:p-8 w-full max-w-full mx-auto animate-in fade-in duration-500">
                 <SystemForm
                     worldId={worldId}
+                    worldName={world.name}
                     storyId={storyId}
                     stories={stories}
                     entry={editingSystem}
@@ -432,6 +459,7 @@ export function WorldClient({
             <div className="p-6 md:p-8 w-full max-w-full mx-auto animate-in fade-in duration-500">
                 <ObjectForm
                     worldId={worldId}
+                    worldName={world.name}
                     storyId={storyId}
                     stories={stories}
                     entry={editingObject}
@@ -444,6 +472,90 @@ export function WorldClient({
             </div>
         );
     }
+
+    const renderLocationTree = (parentId: string | null, depth: number): React.ReactNode => {
+        const locationItems = filteredItems.filter(item => item.sourceType === 'location');
+        const currentLevelLocations = locationItems.filter(item => {
+            if (parentId === null) {
+                return !item.parentId || !locationItems.some(p => p.id === item.parentId);
+            }
+            return item.parentId === parentId;
+        });
+
+        return currentLevelLocations.map((item) => {
+            const hasChildren = locationItems.some(child => child.parentId === item.id);
+            const isExpanded = expandedNodes[item.id] !== false;
+
+            return (
+                <div key={`${item.sourceType}-${item.id}`} className="space-y-1">
+                    <div
+                        className="group flex items-center justify-between gap-3 rounded-2xl border border-border bg-card/60 backdrop-blur-sm p-4 shadow-sm transition-all duration-300 hover:shadow-md hover:border-primary/30 hover:bg-card/80"
+                    >
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                            {hasChildren ? (
+                                <button
+                                    type="button"
+                                    onClick={() => toggleNode(item.id)}
+                                    className="p-1 hover:bg-secondary rounded-md text-muted-foreground transition-colors mr-1 shrink-0"
+                                >
+                                    <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isExpanded ? "" : "-rotate-90"}`} />
+                                </button>
+                            ) : (
+                                <div className="w-8 h-8 shrink-0 mr-1" />
+                            )}
+
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-secondary text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors duration-300 shadow-inner overflow-hidden">
+                                {item.avatarUrl ? (
+                                    <img src={item.avatarUrl} alt={item.name} className="h-full w-full object-cover" />
+                                ) : (
+                                    <TypeIcon type={item.type || 'Location'} />
+                                )}
+                            </div>
+                            
+                            <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <h3 className="text-base sm:text-lg font-bold text-foreground group-hover:text-primary transition-colors truncate">{item.name}</h3>
+                                    <span className="rounded-full bg-secondary/80 border border-muted px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                                        {item.type || 'Entry'}
+                                    </span>
+                                    {item.story && (
+                                        <span className="rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-semibold text-primary whitespace-nowrap">
+                                            Story: {item.story.title}
+                                        </span>
+                                    )}
+                                </div>
+                                <p className="mt-1 text-xs text-muted-foreground font-medium line-clamp-2">{item.description}</p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center shrink-0">
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-primary/10 transition-colors">
+                                        <MoreHorizontal className="h-4.5 w-4.5" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-40">
+                                    <DropdownMenuItem onSelect={() => handleEdit(item)} className="cursor-pointer">
+                                        <Pencil className="mr-2 h-4 w-4" /> Edit Entry
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onSelect={() => handleDelete(item)} className="text-destructive focus:text-destructive cursor-pointer">
+                                        <Trash2 className="mr-2 h-4 w-4" /> Delete Entry
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+                    </div>
+
+                    {hasChildren && isExpanded && (
+                        <div className="space-y-1 pl-4 ml-3 sm:ml-4 border-l border-muted-foreground/15">
+                            {renderLocationTree(item.id, depth + 1)}
+                        </div>
+                    )}
+                </div>
+            );
+        });
+    };
 
     return (
         <div className="p-6 md:p-8 space-y-6 max-w-full mx-auto">
@@ -502,56 +614,62 @@ export function WorldClient({
             </div>
 
             {filteredItems.length > 0 ? (
-                <div className="grid grid-cols-1 gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    {filteredItems.map((item) => (
-                        <div
-                            key={`${item.sourceType}-${item.id}`}
-                            className="group flex items-center justify-between gap-3 rounded-2xl border border-border bg-card/60 backdrop-blur-sm p-4 shadow-sm transition-all duration-300 hover:shadow-md hover:border-primary/30 hover:bg-card/80"
-                        >
-                            <div className="flex items-center gap-3 min-w-0 flex-1">
-                                <div className="flex h-12 w-12 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-xl bg-secondary text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors duration-300 shadow-inner overflow-hidden">
-                                    {item.avatarUrl ? (
-                                        <img src={item.avatarUrl} alt={item.name} className="h-full w-full object-cover" />
-                                    ) : (
-                                        <TypeIcon type={item.type || 'Location'} />
-                                    )}
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <h3 className="text-base sm:text-lg font-bold text-foreground group-hover:text-primary transition-colors truncate">{item.name}</h3>
-                                        <span className="rounded-full bg-secondary/80 border border-muted px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
-                                            {item.type || 'Entry'}{item.category ? ` • ${item.category}` : ''}
-                                        </span>
-                                        {item.story && (
-                                            <span className="rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-semibold text-primary whitespace-nowrap">
-                                                Story: {item.story.title}
-                                            </span>
+                selectedCategory === "Location" ? (
+                    <div className="space-y-2 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        {renderLocationTree(null, 0)}
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        {filteredItems.map((item) => (
+                            <div
+                                key={`${item.sourceType}-${item.id}`}
+                                className="group flex items-center justify-between gap-3 rounded-2xl border border-border bg-card/60 backdrop-blur-sm p-4 shadow-sm transition-all duration-300 hover:shadow-md hover:border-primary/30 hover:bg-card/80"
+                            >
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    <div className="flex h-12 w-12 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-xl bg-secondary text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors duration-300 shadow-inner overflow-hidden">
+                                        {item.avatarUrl ? (
+                                            <img src={item.avatarUrl} alt={item.name} className="h-full w-full object-cover" />
+                                        ) : (
+                                            <TypeIcon type={item.type || 'Location'} />
                                         )}
                                     </div>
-                                    <p className="mt-1 text-xs text-muted-foreground font-medium line-clamp-2">{item.description}</p>
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <h3 className="text-base sm:text-lg font-bold text-foreground group-hover:text-primary transition-colors truncate">{item.name}</h3>
+                                            <span className="rounded-full bg-secondary/80 border border-muted px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                                                {item.type || 'Entry'}{item.category ? ` • ${item.category}` : ''}
+                                            </span>
+                                            {item.story && (
+                                                <span className="rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-semibold text-primary whitespace-nowrap">
+                                                    Story: {item.story.title}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="mt-1 text-xs text-muted-foreground font-medium line-clamp-2">{item.description}</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center shrink-0">
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-primary/10 transition-colors">
+                                                <MoreHorizontal className="h-4.5 w-4.5" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-40">
+                                            <DropdownMenuItem onSelect={() => handleEdit(item)} className="cursor-pointer">
+                                                <Pencil className="mr-2 h-4 w-4" /> Edit Entry
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onSelect={() => handleDelete(item)} className="text-destructive focus:text-destructive cursor-pointer">
+                                                <Trash2 className="mr-2 h-4 w-4" /> Delete Entry
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
                                 </div>
                             </div>
-
-                            <div className="flex items-center shrink-0">
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-primary/10 transition-colors">
-                                            <MoreHorizontal className="h-4.5 w-4.5" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-40">
-                                        <DropdownMenuItem onSelect={() => handleEdit(item)} className="cursor-pointer">
-                                            <Pencil className="mr-2 h-4 w-4" /> Edit Entry
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onSelect={() => handleDelete(item)} className="text-destructive focus:text-destructive cursor-pointer">
-                                            <Trash2 className="mr-2 h-4 w-4" /> Delete Entry
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </div>
-                        </div>
-                    ))}
-                </div>
+                        ))}
+                    </div>
+                )
             ) : (
                 <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-muted/40 py-16 bg-card/20 backdrop-blur-sm animate-in fade-in duration-700">
                     <div className="rounded-2xl bg-muted/30 p-5 mb-4 shadow-inner">

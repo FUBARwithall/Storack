@@ -10,7 +10,7 @@ export default async function WorldPage() {
         where: { worldId: world.id },
         include: { story: true },
         orderBy: { name: 'asc' }
-    })).map(loc => ({ ...loc, type: 'Location' }));
+    })).map(loc => ({ ...loc, type: loc.type || 'Location' }));
 
     const characters = await prisma.character.findMany({
         where: { worldId: world.id },

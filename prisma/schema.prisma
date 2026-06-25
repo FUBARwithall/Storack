@@ -243,8 +243,13 @@ model Location {
   id          String   @id @default(cuid())
   name        String
   description String?
+  type        String?
   mapUrl      String?
   imageUrl    String?
+
+  parentId    String?
+  parent      Location?  @relation("LocationChildren", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Location[] @relation("LocationChildren")
 
   worldId     String
   world       World    @relation(fields: [worldId], references: [id], onDelete: Cascade)

@@ -1053,7 +1053,7 @@ export async function updateCharacterSnapshot(worldId: string, snapshotId: strin
 
 
 // --- Locations ---
-export async function createLocation(worldId: string, data: { name: string, type?: string, description?: string, mapUrl?: string, imageUrl?: string, storyId?: string | null }) {
+export async function createLocation(worldId: string, data: { name: string, type?: string, description?: string, mapUrl?: string, imageUrl?: string, storyId?: string | null, parentId?: string | null }) {
     await requireOwnedWorld(worldId);
     const userId = await requireUserId();
 
@@ -1085,10 +1085,12 @@ export async function createLocation(worldId: string, data: { name: string, type
         data: {
             worldId,
             name: data.name,
+            type: data.type || null,
             description: data.description,
             imageUrl: finalImageUrl,
             mapUrl: finalMapUrl,
-            storyId: data.storyId
+            storyId: data.storyId,
+            parentId: data.parentId && data.parentId !== "none" ? data.parentId : null
         }
     });
     revalidatePath("/world");
@@ -1098,9 +1100,28 @@ export async function createLocation(worldId: string, data: { name: string, type
     return loc;
 }
 
-export async function updateLocation(id: string, data: Partial<{ name: string, type: string, description: string, mapUrl: string, imageUrl: string, storyId: string | null }>) {
+export async function updateLocation(id: string, data: Partial<{ name: string, type: string, description: string, mapUrl: string, imageUrl: string, storyId: string | null, parentId?: string | null }>) {
     const loc = await requireOwnedLocation(id);
     const userId = await requireUserId();
+
+    if (data.parentId && data.parentId !== "none") {
+        if (data.parentId === id) {
+            throw new Error("A location cannot be its own parent.");
+        }
+        
+        let currentParentId: string | null = data.parentId;
+        while (currentParentId) {
+            const parentLocationData: { parentId: string | null } | null = (await prisma.location.findUnique({
+                where: { id: currentParentId },
+                select: { parentId: true }
+            })) as any;
+            if (!parentLocationData) break;
+            if (parentLocationData.parentId === id) {
+                throw new Error("Circular reference detected: Parent cannot be a descendant of this location.");
+            }
+            currentParentId = parentLocationData.parentId || null;
+        }
+    }
 
     let finalImageUrl = data.imageUrl;
     if (data.imageUrl && data.imageUrl.startsWith("data:")) {
@@ -1128,12 +1149,13 @@ export async function updateLocation(id: string, data: Partial<{ name: string, t
 
     const oldLoc = await prisma.location.findUnique({ where: { id }, select: { storyId: true } });
 
-    const { type: _, ...updateData } = data;
+    const { parentId, ...updateData } = data;
 
     const updatedLoc = await prisma.location.update({
         where: { id },
         data: {
             ...updateData,
+            parentId: parentId && parentId !== "none" ? parentId : null,
             imageUrl: finalImageUrl,
             mapUrl: finalMapUrl
         }

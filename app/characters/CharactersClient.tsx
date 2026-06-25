@@ -193,6 +193,7 @@ interface Character {
 interface CharactersClientProps {
     initialCharacters: Character[];
     worldId: string;
+    worldName?: string;
     storyId?: string;
     stories?: any[];
     events?: any[];
@@ -201,7 +202,7 @@ interface CharactersClientProps {
     calendars?: any[];
 }
 
-export function CharactersClient({ initialCharacters, worldId, storyId, stories = [], events = [], chapters = [], locations = [], calendars = [] }: CharactersClientProps) {
+export function CharactersClient({ initialCharacters, worldId, worldName, storyId, stories = [], events = [], chapters = [], locations = [], calendars = [] }: CharactersClientProps) {
     const router = useRouter();
     const [searchTerm, setSearchTerm] = useState("");
     const [viewMode, setViewMode] = useState<'list' | 'form' | 'detail' | 'snapshot-form'>('list');
@@ -503,6 +504,7 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
             <div className="p-4 md:p-8 w-full max-w-full mx-auto animate-in fade-in duration-500">
                 <CharacterForm
                     worldId={worldId}
+                    worldName={worldName}
                     storyId={storyId}
                     stories={stories}
                     character={editingCharacter}

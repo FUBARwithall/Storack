@@ -13,6 +13,7 @@ import { DEFAULT_CALENDAR } from "@/lib/calendar-engine";
 
 interface CharacterFormProps {
     worldId: string;
+    worldName?: string;
     storyId?: string;
     stories?: any[];
     character?: any;
@@ -22,7 +23,7 @@ interface CharacterFormProps {
     onCancel: () => void;
 }
 
-export function CharacterForm({ worldId, storyId, stories = [], character, locations = [], calendars = [], onSave, onCancel }: CharacterFormProps) {
+export function CharacterForm({ worldId, worldName, storyId, stories = [], character, locations = [], calendars = [], onSave, onCancel }: CharacterFormProps) {
     const [name, setName] = useState(character?.name || "");
     const [role, setRole] = useState(character?.role || "Supporting");
     const [avatarUrl, setAvatarUrl] = useState(character?.avatarUrl || "");
@@ -216,10 +217,10 @@ export function CharacterForm({ worldId, storyId, stories = [], character, locat
                                     <Label htmlFor="story" className="text-xs font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Story :</Label>
                                     <Select value={selectedStoryId} onValueChange={setSelectedStoryId}>
                                         <SelectTrigger id="story" className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus:ring-0 focus:border-primary rounded-none !bg-transparent dark:!bg-transparent dark:hover:!bg-transparent px-1 shadow-none transition-all">
-                                            <SelectValue placeholder="Global (World-wide)" />
+                                            <SelectValue placeholder={`Global (${worldName || "World-wide"})`} />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="none">Global (World-wide)</SelectItem>
+                                            <SelectItem value="none">Global ({worldName || "World-wide"})</SelectItem>
                                             {stories.map((s: any) => (
                                                 <SelectItem key={s.id} value={s.id}>
                                                     {s.title}

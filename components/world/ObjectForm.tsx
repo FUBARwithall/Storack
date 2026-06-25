@@ -12,6 +12,7 @@ import { Loader2, Upload, X } from "lucide-react";
 
 interface ObjectFormProps {
     worldId: string;
+    worldName?: string;
     storyId?: string;
     stories?: any[];
     entry?: any;
@@ -19,7 +20,7 @@ interface ObjectFormProps {
     onCancel: () => void;
 }
 
-export function ObjectForm({ worldId, storyId, stories = [], entry, onSave, onCancel }: ObjectFormProps) {
+export function ObjectForm({ worldId, worldName, storyId, stories = [], entry, onSave, onCancel }: ObjectFormProps) {
     const [name, setName] = useState(entry?.name || "");
     const [category, setCategory] = useState(entry?.category || "Artifact");
     const [description, setDescription] = useState(entry?.description || "");
@@ -162,10 +163,10 @@ export function ObjectForm({ worldId, storyId, stories = [], entry, onSave, onCa
                                         <Label htmlFor="story" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Associated Story</Label>
                                         <Select value={selectedStoryId} onValueChange={setSelectedStoryId}>
                                             <SelectTrigger id="story" className="h-11 w-full bg-card/50">
-                                                <SelectValue placeholder="Global (World-wide)" />
+                                                <SelectValue placeholder={`Global (${worldName || "World-wide"})`} />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="none">Global (World-wide)</SelectItem>
+                                                <SelectItem value="none">Global ({worldName || "World-wide"})</SelectItem>
                                                 {stories.map((s: any) => (
                                                     <SelectItem key={s.id} value={s.id}>
                                                         {s.title}

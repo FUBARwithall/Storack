@@ -25,7 +25,7 @@ export default async function ChapterCastPage({ params }: { params: Promise<{ id
     const availableLocations = (await prisma.location.findMany({
         where: { storyId: story.id },
         orderBy: { name: 'asc' }
-    })).map(loc => ({ ...loc, type: 'Location' }));
+    })).map(loc => ({ ...loc, type: loc.type || 'Location' }));
 
     return (
         <CastClient

@@ -12,6 +12,7 @@ import { Loader2, Upload, X } from "lucide-react";
 
 interface FactionFormProps {
     worldId: string;
+    worldName?: string;
     storyId?: string;
     stories?: any[];
     entry?: any;
@@ -19,7 +20,7 @@ interface FactionFormProps {
     onCancel: () => void;
 }
 
-export function FactionForm({ worldId, storyId, stories = [], entry, onSave, onCancel }: FactionFormProps) {
+export function FactionForm({ worldId, worldName, storyId, stories = [], entry, onSave, onCancel }: FactionFormProps) {
     const [name, setName] = useState(entry?.name || "");
     const [type, setType] = useState(entry?.type || "Faction");
     const [description, setDescription] = useState(entry?.description || "");
@@ -159,10 +160,10 @@ export function FactionForm({ worldId, storyId, stories = [], entry, onSave, onC
                                         <Label htmlFor="story" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Associated Story</Label>
                                         <Select value={selectedStoryId} onValueChange={setSelectedStoryId}>
                                             <SelectTrigger id="story" className="h-11 w-full bg-card/50">
-                                                <SelectValue placeholder="Global (World-wide)" />
+                                                <SelectValue placeholder={`Global (${worldName || "World-wide"})`} />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="none">Global (World-wide)</SelectItem>
+                                                <SelectItem value="none">Global ({worldName || "World-wide"})</SelectItem>
                                                 {stories.map((s: any) => (
                                                     <SelectItem key={s.id} value={s.id}>
                                                         {s.title}
