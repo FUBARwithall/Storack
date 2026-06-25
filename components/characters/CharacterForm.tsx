@@ -145,7 +145,7 @@ export function CharacterForm({ worldId, storyId, stories = [], character, locat
 
     return (
         <Card className="w-full max-w-4xl mx-auto border-none shadow-none bg-transparent">
-            <CardHeader className="px-0 pt-0 pb-6 border-b flex flex-row items-center gap-4">
+            <CardHeader className="px-0 pt-0 pb-4 border-b flex flex-row items-center gap-4">
                 <Button variant="ghost" size="icon" onClick={onCancel} className="shrink-0 h-10 w-10 bg-secondary/50 rounded-full hover:bg-secondary">
                     <ChevronLeft className="h-5 w-5" />
                 </Button>
@@ -158,9 +158,9 @@ export function CharacterForm({ worldId, storyId, stories = [], character, locat
                     </CardDescription>
                 </div>
             </CardHeader>
-            <CardContent className="px-0 pt-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <CardContent className="px-0 pt-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <form onSubmit={handleSubmit} className="space-y-8">
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-stretch">
                         {/* Left Column: Avatar Section */}
                         <div className="lg:col-span-5 flex flex-col gap-2">
                             <div
@@ -207,7 +207,7 @@ export function CharacterForm({ worldId, storyId, stories = [], character, locat
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
                                     required
-                                    className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none bg-transparent dark:bg-transparent px-1 shadow-none transition-all placeholder:text-muted-foreground/50"
+                                    className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none !bg-transparent dark:!bg-transparent px-1 shadow-none transition-all placeholder:text-muted-foreground/50"
                                 />
                             </div>
 
@@ -215,7 +215,7 @@ export function CharacterForm({ worldId, storyId, stories = [], character, locat
                                 <div className="flex items-center gap-2">
                                     <Label htmlFor="story" className="text-xs font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Story :</Label>
                                     <Select value={selectedStoryId} onValueChange={setSelectedStoryId}>
-                                        <SelectTrigger id="story" className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus:ring-0 focus:border-primary rounded-none bg-transparent dark:bg-transparent dark:hover:bg-transparent px-1 shadow-none transition-all">
+                                        <SelectTrigger id="story" className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus:ring-0 focus:border-primary rounded-none !bg-transparent dark:!bg-transparent dark:hover:!bg-transparent px-1 shadow-none transition-all">
                                             <SelectValue placeholder="Global (World-wide)" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -232,7 +232,7 @@ export function CharacterForm({ worldId, storyId, stories = [], character, locat
                                 <div className="flex items-center gap-2">
                                     <Label htmlFor="role" className="text-xs font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Role :</Label>
                                     <Select value={role} onValueChange={setRole}>
-                                        <SelectTrigger id="role" className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus:ring-0 focus:border-primary rounded-none bg-transparent dark:bg-transparent dark:hover:bg-transparent px-1 shadow-none transition-all">
+                                        <SelectTrigger id="role" className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus:ring-0 focus:border-primary rounded-none !bg-transparent dark:!bg-transparent dark:hover:!bg-transparent px-1 shadow-none transition-all">
                                             <SelectValue placeholder="Select a role" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -249,22 +249,26 @@ export function CharacterForm({ worldId, storyId, stories = [], character, locat
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-2.5">
                                 <div className="flex items-center gap-2">
                                     <Label htmlFor="age" className="text-xs font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Age :</Label>
-                                    <Input id="age" placeholder="e.g. 24" value={age} onChange={(e) => setAge(e.target.value)} className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none bg-transparent dark:bg-transparent px-1 shadow-none transition-all placeholder:text-muted-foreground/50" />
+                                    <Input id="age" placeholder="e.g. 24" value={age} onChange={(e) => setAge(e.target.value)} className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none !bg-transparent dark:!bg-transparent px-1 shadow-none transition-all placeholder:text-muted-foreground/50" />
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <Label htmlFor="height" className="text-xs font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Height :</Label>
-                                    <Input id="height" placeholder="e.g. 175 cm" value={height} onChange={(e) => setHeight(e.target.value)} className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none bg-transparent dark:bg-transparent px-1 shadow-none transition-all placeholder:text-muted-foreground/50" />
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <Label htmlFor="weight" className="text-xs font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Weight :</Label>
-                                    <Input id="weight" placeholder="e.g. 68 kg" value={weight} onChange={(e) => setWeight(e.target.value)} className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none bg-transparent dark:bg-transparent px-1 shadow-none transition-all placeholder:text-muted-foreground/50" />
+
+                                <div className="col-span-1 sm:col-span-2 grid grid-cols-2 gap-x-6">
+                                    <div className="flex items-center gap-2">
+                                        <Label htmlFor="height" className="text-xs font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Height :</Label>
+                                        <Input id="height" placeholder="e.g. 175 cm" value={height} onChange={(e) => setHeight(e.target.value)} className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none !bg-transparent dark:!bg-transparent px-1 shadow-none transition-all placeholder:text-muted-foreground/50" />
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                        <Label htmlFor="weight" className="text-xs font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Weight :</Label>
+                                        <Input id="weight" placeholder="e.g. 68 kg" value={weight} onChange={(e) => setWeight(e.target.value)} className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none !bg-transparent dark:!bg-transparent px-1 shadow-none transition-all placeholder:text-muted-foreground/50" />
+                                    </div>
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5">
                                 <div className="flex items-center gap-2">
                                     <Label htmlFor="species" className="text-xs font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Species :</Label>
-                                    <Input id="species" placeholder="e.g. Human" value={species} onChange={(e) => setSpecies(e.target.value)} className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none bg-transparent dark:bg-transparent px-1 shadow-none transition-all placeholder:text-muted-foreground/50" />
+                                    <Input id="species" placeholder="e.g. Human" value={species} onChange={(e) => setSpecies(e.target.value)} className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none !bg-transparent dark:!bg-transparent px-1 shadow-none transition-all placeholder:text-muted-foreground/50" />
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Label htmlFor="gender" className="text-xs font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Gender :</Label>
@@ -282,7 +286,7 @@ export function CharacterForm({ worldId, storyId, stories = [], character, locat
                                                 }
                                             }}
                                         >
-                                            <SelectTrigger id="gender" className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus:ring-0 focus:border-primary rounded-none bg-transparent dark:bg-transparent dark:hover:bg-transparent px-1 shadow-none transition-all">
+                                            <SelectTrigger id="gender" className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus:ring-0 focus:border-primary rounded-none !bg-transparent dark:!bg-transparent dark:hover:!bg-transparent px-1 shadow-none transition-all">
                                                 <SelectValue placeholder="Select gender" />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -299,7 +303,7 @@ export function CharacterForm({ worldId, storyId, stories = [], character, locat
                                                 placeholder="Type custom gender"
                                                 value={gender}
                                                 onChange={(e) => setGender(e.target.value)}
-                                                className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none bg-transparent dark:bg-transparent px-1 shadow-none transition-all placeholder:text-muted-foreground/50"
+                                                className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none !bg-transparent dark:!bg-transparent px-1 shadow-none transition-all placeholder:text-muted-foreground/50"
                                             />
                                             <Button 
                                                 type="button"
@@ -321,12 +325,12 @@ export function CharacterForm({ worldId, storyId, stories = [], character, locat
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5">
                                 <div className="flex items-center gap-2">
                                     <Label htmlFor="occupation" className="text-xs font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Occupation :</Label>
-                                    <Input id="occupation" placeholder="e.g. Knight" value={occupation} onChange={(e) => setOccupation(e.target.value)} className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none bg-transparent dark:bg-transparent px-1 shadow-none transition-all placeholder:text-muted-foreground/50" />
+                                    <Input id="occupation" placeholder="e.g. Knight" value={occupation} onChange={(e) => setOccupation(e.target.value)} className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none !bg-transparent dark:!bg-transparent px-1 shadow-none transition-all placeholder:text-muted-foreground/50" />
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Label htmlFor="birthplace" className="text-xs font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Birthplace :</Label>
                                     <Select value={birthplaceId} onValueChange={setBirthplaceId}>
-                                        <SelectTrigger id="birthplace" className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus:ring-0 focus:border-primary rounded-none bg-transparent dark:bg-transparent dark:hover:bg-transparent px-1 shadow-none transition-all">
+                                        <SelectTrigger id="birthplace" className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus:ring-0 focus:border-primary rounded-none !bg-transparent dark:!bg-transparent dark:hover:!bg-transparent px-1 shadow-none transition-all">
                                             <SelectValue placeholder="Unknown / Unset" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -345,7 +349,7 @@ export function CharacterForm({ worldId, storyId, stories = [], character, locat
                             <div className="flex items-center gap-2">
                                 <Label htmlFor="calendar" className="text-xs font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Calendar System :</Label>
                                 <Select value={calendarId} onValueChange={setCalendarId}>
-                                    <SelectTrigger id="calendar" className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus:ring-0 focus:border-primary rounded-none bg-transparent dark:bg-transparent dark:hover:bg-transparent px-1 shadow-none transition-all">
+                                    <SelectTrigger id="calendar" className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus:ring-0 focus:border-primary rounded-none !bg-transparent dark:!bg-transparent dark:hover:!bg-transparent px-1 shadow-none transition-all">
                                         <SelectValue placeholder="Select a calendar system" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -373,9 +377,9 @@ export function CharacterForm({ worldId, storyId, stories = [], character, locat
                                         <div className="flex items-center gap-2">
                                             <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Birth Date :</Label>
                                             <div className="flex-1 grid grid-cols-3 gap-2">
-                                                <Input id="birth-day" type="number" min={1} placeholder="Day" value={birthDay} onChange={(e) => setBirthDay(e.target.value)} className="h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none bg-transparent dark:bg-transparent px-1 shadow-none transition-all placeholder:text-muted-foreground/50" />
+                                                <Input id="birth-day" type="number" min={1} placeholder="Day" value={birthDay} onChange={(e) => setBirthDay(e.target.value)} className="h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none !bg-transparent dark:!bg-transparent px-1 shadow-none transition-all placeholder:text-muted-foreground/50" />
                                                 <Select value={birthMonth} onValueChange={setBirthMonth}>
-                                                    <SelectTrigger id="birth-month" className="w-full h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus:ring-0 focus:border-primary rounded-none bg-transparent dark:bg-transparent dark:hover:bg-transparent px-1 shadow-none transition-all">
+                                                    <SelectTrigger id="birth-month" className="w-full h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus:ring-0 focus:border-primary rounded-none !bg-transparent dark:!bg-transparent dark:hover:!bg-transparent px-1 shadow-none transition-all">
                                                         <SelectValue placeholder="Month" />
                                                     </SelectTrigger>
                                                     <SelectContent>
@@ -386,7 +390,7 @@ export function CharacterForm({ worldId, storyId, stories = [], character, locat
                                                         ))}
                                                     </SelectContent>
                                                 </Select>
-                                                <Input id="birth-year" type="number" placeholder="Year" value={birthYear} onChange={(e) => setBirthYear(e.target.value)} className="h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none bg-transparent dark:bg-transparent px-1 shadow-none transition-all placeholder:text-muted-foreground/50" />
+                                                <Input id="birth-year" type="number" placeholder="Year" value={birthYear} onChange={(e) => setBirthYear(e.target.value)} className="h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none !bg-transparent dark:!bg-transparent px-1 shadow-none transition-all placeholder:text-muted-foreground/50" />
                                             </div>
                                         </div>
 
@@ -394,9 +398,9 @@ export function CharacterForm({ worldId, storyId, stories = [], character, locat
                                         <div className="flex items-center gap-2">
                                             <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Death Date :</Label>
                                             <div className="flex-1 grid grid-cols-3 gap-2">
-                                                <Input id="death-day" type="number" min={1} placeholder="Day" value={deathDay} onChange={(e) => setDeathDay(e.target.value)} className="h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none bg-transparent dark:bg-transparent px-1 shadow-none transition-all placeholder:text-muted-foreground/50" />
+                                                <Input id="death-day" type="number" min={1} placeholder="Day" value={deathDay} onChange={(e) => setDeathDay(e.target.value)} className="h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none !bg-transparent dark:!bg-transparent px-1 shadow-none transition-all placeholder:text-muted-foreground/50" />
                                                 <Select value={deathMonth} onValueChange={setDeathMonth}>
-                                                    <SelectTrigger id="death-month" className="w-full h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus:ring-0 focus:border-primary rounded-none bg-transparent dark:bg-transparent dark:hover:bg-transparent px-1 shadow-none transition-all">
+                                                    <SelectTrigger id="death-month" className="w-full h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus:ring-0 focus:border-primary rounded-none !bg-transparent dark:!bg-transparent dark:hover:!bg-transparent px-1 shadow-none transition-all">
                                                         <SelectValue placeholder="Month" />
                                                     </SelectTrigger>
                                                     <SelectContent>
@@ -407,7 +411,7 @@ export function CharacterForm({ worldId, storyId, stories = [], character, locat
                                                         ))}
                                                     </SelectContent>
                                                 </Select>
-                                                <Input id="death-year" type="number" placeholder="Year" value={deathYear} onChange={(e) => setDeathYear(e.target.value)} className="h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none bg-transparent dark:bg-transparent px-1 shadow-none transition-all placeholder:text-muted-foreground/50" />
+                                                <Input id="death-year" type="number" placeholder="Year" value={deathYear} onChange={(e) => setDeathYear(e.target.value)} className="h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none !bg-transparent dark:!bg-transparent px-1 shadow-none transition-all placeholder:text-muted-foreground/50" />
                                             </div>
                                         </div>
                                     </div>

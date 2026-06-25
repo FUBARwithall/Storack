@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Search, Plus, User, MoreHorizontal, Pencil, Trash2, ChevronLeft, Link as LinkIcon, Heart, Calendar as CalendarIcon, Clock, ShieldAlert } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Search, Plus, User, MoreHorizontal, Pencil, Trash2, ChevronLeft, Link as LinkIcon, Heart, Calendar as CalendarIcon, Clock, ShieldAlert, Upload, X } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { CharacterForm } from "@/components/characters/CharacterForm";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -204,7 +204,7 @@ interface CharactersClientProps {
 export function CharactersClient({ initialCharacters, worldId, storyId, stories = [], events = [], chapters = [], locations = [], calendars = [] }: CharactersClientProps) {
     const router = useRouter();
     const [searchTerm, setSearchTerm] = useState("");
-    const [viewMode, setViewMode] = useState<'list' | 'form' | 'detail'>('list');
+    const [viewMode, setViewMode] = useState<'list' | 'form' | 'detail' | 'snapshot-form'>('list');
     const [editingCharacter, setEditingCharacter] = useState<Character | undefined>(undefined);
     const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'overview' | 'relationships' | 'timeline' | 'history'>('overview');
@@ -226,13 +226,13 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
     const [isAppSaving, setIsAppSaving] = useState(false);
 
     // Snapshot state
-    const [isSnapshotModalOpen, setIsSnapshotModalOpen] = useState(false);
     const [snapLabel, setSnapLabel] = useState("");
     const [snapNote, setSnapNote] = useState("");
     const [snapName, setSnapName] = useState("");
     const [snapRole, setSnapRole] = useState("");
     const [snapAge, setSnapAge] = useState("");
     const [snapGender, setSnapGender] = useState("");
+    const [snapGenderSelectMode, setSnapGenderSelectMode] = useState<"select" | "custom">("select");
     const [snapSpecies, setSnapSpecies] = useState("");
     const [snapOccupation, setSnapOccupation] = useState("");
     const [snapPersonality, setSnapPersonality] = useState("");
@@ -244,6 +244,7 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
     const [snapChapterId, setSnapChapterId] = useState("");
     const [isSnapSaving, setIsSnapSaving] = useState(false);
     const [editingSnapshotId, setEditingSnapshotId] = useState<string | null>(null);
+    const snapFileInputRef = useRef<HTMLInputElement>(null);
 
     const filteredCharacters = initialCharacters.filter(char => {
         const display = getDisplayState(char);
@@ -390,6 +391,9 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
             setSnapRole(snapshot.role || "");
             setSnapAge(snapshot.age || "");
             setSnapGender(snapshot.gender || "");
+            setSnapGenderSelectMode(
+                snapshot.gender === "Male" || snapshot.gender === "Female" || !snapshot.gender ? "select" : "custom"
+            );
             setSnapSpecies(snapshot.species || "");
             setSnapOccupation(snapshot.occupation || "");
             setSnapPersonality(snapshot.personality || "");
@@ -407,6 +411,9 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
             setSnapRole(activeChar.role || "");
             setSnapAge(activeChar.age || "");
             setSnapGender(activeChar.gender || "");
+            setSnapGenderSelectMode(
+                activeChar.gender === "Male" || activeChar.gender === "Female" || !activeChar.gender ? "select" : "custom"
+            );
             setSnapSpecies(activeChar.species || "");
             setSnapOccupation(activeChar.occupation || "");
             setSnapPersonality(activeChar.personality || "");
@@ -417,7 +424,7 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
             setSnapEventId("");
             setSnapChapterId("");
         }
-        setIsSnapshotModalOpen(true);
+        setViewMode('snapshot-form');
     };
 
     const handleAddSnapshot = async (e: React.FormEvent) => {
@@ -470,7 +477,7 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
                     deathdate: activeChar.deathdate || null,
                 });
             }
-            setIsSnapshotModalOpen(false);
+            setViewMode('detail');
             setEditingSnapshotId(null);
             router.refresh();
         } catch (err) {
@@ -493,7 +500,7 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
 
     if (viewMode === 'form') {
         return (
-            <div className="p-6 md:p-8 w-full max-w-full mx-auto animate-in fade-in duration-500">
+            <div className="p-4 md:p-8 w-full max-w-full mx-auto animate-in fade-in duration-500">
                 <CharacterForm
                     worldId={worldId}
                     storyId={storyId}
@@ -509,6 +516,331 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
                         setViewMode(selectedCharacterId ? 'detail' : 'list');
                     }}
                 />
+            </div>
+        );
+    }
+
+    const handleSnapFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setSnapAvatarUrl(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    if (viewMode === 'snapshot-form' && activeChar) {
+        return (
+            <div className="p-4 md:p-8 w-full max-w-5xl mx-auto animate-in fade-in duration-500">
+                <Card className="w-full border-none shadow-none bg-transparent">
+                    <CardHeader className="px-0 pt-0 pb-4 border-b flex flex-row items-center gap-4">
+                        <Button variant="ghost" size="icon" onClick={() => setViewMode('detail')} className="shrink-0 h-10 w-10 bg-secondary/50 rounded-full hover:bg-secondary">
+                            <ChevronLeft className="h-5 w-5" />
+                        </Button>
+                        <div>
+                            <CardTitle className="text-2xl flex items-center gap-2">
+                                <Clock className="h-6 w-6 text-primary" /> {editingSnapshotId ? "Edit Snapshot" : "Create Snapshot"}
+                            </CardTitle>
+                            <CardDescription>
+                                {editingSnapshotId ? "Update this version record of the character." : "Create a new version snapshot to document changes in history."}
+                            </CardDescription>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="px-0 pt-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <form onSubmit={handleAddSnapshot} className="space-y-8">
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-8 items-start">
+                                {/* Left Column: Avatar & Snapshot Settings */}
+                                <div className="lg:col-span-5 flex flex-col gap-6">
+                                    {/* Avatar Section */}
+                                    <div className="flex flex-col gap-2">
+                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Snapshot Avatar Preview</Label>
+                                        <div
+                                            className="aspect-square rounded-3xl p-4 bg-muted/50 border-2 border-dashed border-muted-foreground/30 flex items-center justify-center relative overflow-hidden group cursor-pointer hover:border-primary/50 transition-all shadow-sm hover:shadow-md w-full"
+                                            onClick={() => snapFileInputRef.current?.click()}
+                                        >
+                                            {snapAvatarUrl ? (
+                                                <>
+                                                    <img src={snapAvatarUrl} alt="Preview" className="absolute inset-0 h-full w-full object-cover" />
+                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                        <Upload className="h-10 w-10 text-white drop-shadow-md" />
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => { e.stopPropagation(); setSnapAvatarUrl(""); }}
+                                                        className="absolute top-2 right-2 p-1.5 bg-background/80 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive hover:text-white"
+                                                    >
+                                                        <X className="h-4 w-4" />
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <div className="flex flex-col items-center gap-3 text-muted-foreground group-hover:text-primary transition-colors">
+                                                    <Upload className="h-10 w-10" />
+                                                    <span className="text-sm font-bold uppercase tracking-wider">Upload Avatar</span>
+                                                </div>
+                                            )}
+                                            <input
+                                                type="file"
+                                                ref={snapFileInputRef}
+                                                className="hidden"
+                                                accept="image/*"
+                                                onChange={handleSnapFileChange}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Snapshot Core Configs */}
+                                    <div className="space-y-4 pt-4 border-t border-border/50">
+                                        <h4 className="text-xs font-bold uppercase tracking-widest text-primary">Snapshot Settings</h4>
+                                        
+                                        <div className="flex flex-col gap-2">
+                                            <Label htmlFor="snapLabel" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Snapshot Label *</Label>
+                                            <Input
+                                                id="snapLabel"
+                                                placeholder="e.g. After Timeskip, Post-Curse"
+                                                value={snapLabel}
+                                                onChange={(e) => setSnapLabel(e.target.value)}
+                                                required
+                                                className="h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none !bg-transparent dark:!bg-transparent px-1 shadow-none transition-all placeholder:text-muted-foreground/50"
+                                            />
+                                        </div>
+
+                                        <div className="flex flex-col gap-2">
+                                            <Label htmlFor="snapNote" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Change Notes (Optional)</Label>
+                                            <Textarea
+                                                id="snapNote"
+                                                placeholder="Describe what changed in this version and why..."
+                                                value={snapNote}
+                                                onChange={(e) => setSnapNote(e.target.value)}
+                                                className="min-h-[80px] resize-none"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Right Column: Character Attributes in this Snapshot */}
+                                <div className="lg:col-span-7 space-y-6">
+                                    <div className="space-y-4">
+                                        <h4 className="text-xs font-bold uppercase tracking-widest text-primary">Character Attributes in this Version</h4>
+
+                                        <div className="flex items-center gap-2">
+                                            <Label htmlFor="snapName" className="text-xs font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Name :</Label>
+                                            <Input
+                                                id="snapName"
+                                                value={snapName}
+                                                onChange={(e) => setSnapName(e.target.value)}
+                                                required
+                                                className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none !bg-transparent dark:!bg-transparent px-1 shadow-none transition-all placeholder:text-muted-foreground/50"
+                                            />
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                                            <div className="flex items-center gap-2">
+                                                <Label htmlFor="snapRole" className="text-xs font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Role :</Label>
+                                                <Select value={snapRole} onValueChange={setSnapRole}>
+                                                    <SelectTrigger id="snapRole" className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus:ring-0 focus:border-primary rounded-none !bg-transparent dark:!bg-transparent dark:hover:!bg-transparent px-1 shadow-none transition-all">
+                                                        <SelectValue placeholder="Select a role" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="Protagonist">Protagonist</SelectItem>
+                                                        <SelectItem value="Antagonist">Antagonist</SelectItem>
+                                                        <SelectItem value="Supporting">Supporting</SelectItem>
+                                                        <SelectItem value="Minor">Minor</SelectItem>
+                                                        <SelectItem value="Mystery">Mystery/Unassigned</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                <Label htmlFor="snapOccupation" className="text-xs font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Occupation :</Label>
+                                                <Input
+                                                    id="snapOccupation"
+                                                    value={snapOccupation}
+                                                    onChange={(e) => setSnapOccupation(e.target.value)}
+                                                    className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none !bg-transparent dark:!bg-transparent px-1 shadow-none transition-all placeholder:text-muted-foreground/50"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                                            <div className="flex items-center gap-2">
+                                                <Label htmlFor="snapGender" className="text-xs font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Gender :</Label>
+                                                {snapGenderSelectMode === "select" ? (
+                                                    <Select 
+                                                        value={snapGender === "Male" || snapGender === "Female" ? snapGender : (snapGender ? "Custom" : "none")} 
+                                                        onValueChange={(val) => {
+                                                            if (val === "Custom") {
+                                                                setSnapGenderSelectMode("custom");
+                                                                setSnapGender("");
+                                                            } else if (val === "none") {
+                                                                setSnapGender("");
+                                                            } else {
+                                                                setSnapGender(val);
+                                                            }
+                                                        }}
+                                                    >
+                                                        <SelectTrigger id="snapGender" className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus:ring-0 focus:border-primary rounded-none !bg-transparent dark:!bg-transparent dark:hover:!bg-transparent px-1 shadow-none transition-all">
+                                                            <SelectValue placeholder="Select gender" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="none">Unknown / Unset</SelectItem>
+                                                            <SelectItem value="Male">Male</SelectItem>
+                                                            <SelectItem value="Female">Female</SelectItem>
+                                                            <SelectItem value="Custom">Custom...</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                ) : (
+                                                    <div className="flex-1 flex items-center gap-1">
+                                                        <Input 
+                                                            id="snapGender"
+                                                            placeholder="Type custom gender"
+                                                            value={snapGender}
+                                                            onChange={(e) => setSnapGender(e.target.value)}
+                                                            className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none !bg-transparent dark:!bg-transparent px-1 shadow-none transition-all placeholder:text-muted-foreground/50"
+                                                        />
+                                                        <Button 
+                                                            type="button"
+                                                            variant="ghost"
+                                                            onClick={() => {
+                                                                setSnapGenderSelectMode("select");
+                                                                setSnapGender("");
+                                                            }}
+                                                            className="h-7 w-7 p-0 rounded-full hover:bg-muted"
+                                                            title="Back to dropdown"
+                                                        >
+                                                            <X className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                <Label htmlFor="snapSpecies" className="text-xs font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Species :</Label>
+                                                <Input
+                                                    id="snapSpecies"
+                                                    value={snapSpecies}
+                                                    onChange={(e) => setSnapSpecies(e.target.value)}
+                                                    className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none !bg-transparent dark:!bg-transparent px-1 shadow-none transition-all placeholder:text-muted-foreground/50"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-4">
+                                            <div className="flex items-center gap-2">
+                                                <Label htmlFor="snapAge" className="text-xs font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Age :</Label>
+                                                <Input
+                                                    id="snapAge"
+                                                    value={snapAge}
+                                                    onChange={(e) => setSnapAge(e.target.value)}
+                                                    className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none !bg-transparent dark:!bg-transparent px-1 shadow-none transition-all placeholder:text-muted-foreground/50"
+                                                />
+                                            </div>
+
+                                            <div className="col-span-1 sm:col-span-2 grid grid-cols-2 gap-x-6">
+                                                <div className="flex items-center gap-2">
+                                                    <Label htmlFor="snapHeight" className="text-xs font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Height :</Label>
+                                                    <Input
+                                                        id="snapHeight"
+                                                        value={snapHeight}
+                                                        onChange={(e) => setSnapHeight(e.target.value)}
+                                                        className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none !bg-transparent dark:!bg-transparent px-1 shadow-none transition-all placeholder:text-muted-foreground/50"
+                                                    />
+                                                </div>
+
+                                                <div className="flex items-center gap-2">
+                                                    <Label htmlFor="snapWeight" className="text-xs font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Weight :</Label>
+                                                    <Input
+                                                        id="snapWeight"
+                                                        value={snapWeight}
+                                                        onChange={(e) => setSnapWeight(e.target.value)}
+                                                        className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus-visible:border-primary focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none !bg-transparent dark:!bg-transparent px-1 shadow-none transition-all placeholder:text-muted-foreground/50"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-4 pt-4 border-t border-border/50">
+                                        <h4 className="text-xs font-bold uppercase tracking-widest text-primary">Story Context Anchoring</h4>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                                            <div className="flex items-center gap-2">
+                                                <Label htmlFor="snapEvent" className="text-xs font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Anchor to Event :</Label>
+                                                <Select value={snapEventId} onValueChange={setSnapEventId}>
+                                                    <SelectTrigger id="snapEvent" className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus:ring-0 focus:border-primary rounded-none !bg-transparent dark:!bg-transparent px-1 shadow-none transition-all">
+                                                        <SelectValue placeholder="None" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="none">None</SelectItem>
+                                                        {events.map(e => {
+                                                            const engine = new CalendarEngine(toCalendarConfig(e.calendar));
+                                                            return (
+                                                                <SelectItem key={e.id} value={e.id}>
+                                                                    {e.title} ({engine.formatDate(e.startDate)})
+                                                                </SelectItem>
+                                                            );
+                                                        })}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                <Label htmlFor="snapChapter" className="text-xs font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Anchor to Chapter :</Label>
+                                                <Select value={snapChapterId} onValueChange={setSnapChapterId}>
+                                                    <SelectTrigger id="snapChapter" className="flex-1 h-9 border-x-0 border-t-0 border-b border-muted-foreground/30 focus:ring-0 focus:border-primary rounded-none !bg-transparent dark:!bg-transparent px-1 shadow-none transition-all">
+                                                        <SelectValue placeholder="None" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="none">None</SelectItem>
+                                                        {chapters.map(c => (
+                                                            <SelectItem key={c.id} value={c.id}>
+                                                                {c.title}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-4 pt-4 border-t border-border/50">
+                                        <h4 className="text-xs font-bold uppercase tracking-widest text-primary">Traits & Lore</h4>
+                                        <div className="space-y-4">
+                                            <div className="flex flex-col gap-2">
+                                                <Label htmlFor="snapPersonality" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Personality</Label>
+                                                <Textarea
+                                                    id="snapPersonality"
+                                                    value={snapPersonality}
+                                                    onChange={(e) => setSnapPersonality(e.target.value)}
+                                                    className="min-h-[80px] resize-none"
+                                                />
+                                            </div>
+
+                                            <div className="flex flex-col gap-2">
+                                                <Label htmlFor="snapBackstory" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Backstory</Label>
+                                                <Textarea
+                                                    id="snapBackstory"
+                                                    value={snapBackstory}
+                                                    onChange={(e) => setSnapBackstory(e.target.value)}
+                                                    className="min-h-[80px] resize-none"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex justify-end gap-3 pt-6 border-t border-border/50">
+                                        <Button type="button" variant="outline" onClick={() => setViewMode('detail')} disabled={isSnapSaving}>
+                                            Cancel
+                                        </Button>
+                                        <Button type="submit" disabled={isSnapSaving || !snapLabel || !snapName}>
+                                            {isSnapSaving ? "Saving..." : (editingSnapshotId ? "Save Changes" : "Create Snapshot")}
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </CardContent>
+                </Card>
             </div>
         );
     }
@@ -537,13 +869,12 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
             <div className="p-6 md:p-8 space-y-6 max-w-5xl mx-auto animate-in fade-in duration-500 relative">
                 {/* Header Back Row */}
                 <div>
-                    <Button variant="ghost" onClick={() => setViewMode('list')} className="h-9 px-4 rounded-full bg-secondary/40 hover:bg-secondary">
+                    <Button variant="ghost" onClick={() => setViewMode('list')} className="h-9 px-4 rounded-full">
                         <ChevronLeft className="mr-1 h-4 w-4" /> Back to List
                     </Button>
                 </div>
 
                 {/* Master Character Sheet Card */}
-                <Card className="border-none bg-card/40 backdrop-blur-md rounded-none p-6 shadow-none">
                     <div className="flex flex-col lg:flex-row gap-8 items-start">
                         {/* Left Column: Sticky Profile Card */}
                         <div className="shrink-0 w-full lg:w-auto flex justify-center lg:justify-start lg:sticky lg:top-6">
@@ -636,12 +967,12 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
                         {/* Right Column: Tabs and Details */}
                         <div className="flex-1 w-full space-y-6">
                             {/* Tabs Selector */}
-                            <div className="flex border-b border-border gap-2">
+                            <div className="flex overflow-x-auto whitespace-nowrap border-b border-border gap-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                                 {(['overview', 'relationships', 'timeline', 'history'] as const).map((tab) => (
                                     <button
                                         key={tab}
                                         onClick={() => setActiveTab(tab)}
-                                        className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all relative capitalize -mb-[2px] ${activeTab === tab
+                                        className={`shrink-0 px-4 py-2.5 text-sm font-semibold border-b-2 transition-all relative capitalize -mb-[2px] ${activeTab === tab
                                                 ? "border-primary text-primary"
                                                 : "border-transparent text-muted-foreground hover:text-foreground"
                                             }`}
@@ -749,7 +1080,7 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
                                                                      <div className="absolute right-2 top-1.5 z-10">
                                                                          <DropdownMenu>
                                                                              <DropdownMenuTrigger asChild>
-                                                                                 <Button variant="ghost" size="icon" className="h-7 w-7 rounded-none opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground">
+                                                                                 <Button variant="ghost" size="icon" className="h-7 w-7 rounded-none opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground">
                                                                                      <MoreHorizontal className="h-4 w-4" />
                                                                                  </Button>
                                                                              </DropdownMenuTrigger>
@@ -793,7 +1124,7 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
                                                                      <div className="absolute right-2 top-1.5 z-10">
                                                                          <DropdownMenu>
                                                                              <DropdownMenuTrigger asChild>
-                                                                                 <Button variant="ghost" size="icon" className="h-7 w-7 rounded-none opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground">
+                                                                                 <Button variant="ghost" size="icon" className="h-7 w-7 rounded-none opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground">
                                                                                      <MoreHorizontal className="h-4 w-4" />
                                                                                  </Button>
                                                                              </DropdownMenuTrigger>
@@ -892,7 +1223,7 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
                                                                     onClick={() => handleDeleteAppearance(app.id)}
                                                                     variant="ghost"
                                                                     size="icon"
-                                                                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full absolute right-3 top-3 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                                                                 >
                                                                     <Trash2 className="h-3.5 w-3.5" />
                                                                 </Button>
@@ -919,7 +1250,7 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
                                                 <h3 className="font-bold text-lg text-foreground">State History</h3>
                                                 <p className="text-xs text-muted-foreground">Historical records of how this character changed over time.</p>
                                             </div>
-                                            <Button size="sm" onClick={handleOpenSnapshotModal} className="h-9 px-4">
+                                            <Button size="sm" onClick={() => handleOpenSnapshotModal()} className="h-9 px-4">
                                                 <Plus className="mr-1.5 h-4 w-4" /> Create Snapshot
                                             </Button>
                                         </div>
@@ -970,7 +1301,7 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
                                                                 </div>
 
                                                                 {/* Top-right dropdown */}
-                                                                <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <div className="absolute top-3 right-3 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                                                     <DropdownMenu>
                                                                         <DropdownMenuTrigger asChild>
                                                                             <Button variant="ghost" size="icon" className="h-7 w-7 rounded-none text-muted-foreground hover:text-foreground">
@@ -1004,7 +1335,6 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
                             </div>
                         </div>
                     </div>
-                </Card>
 
 
                 {/* MODAL: ADD/EDIT RELATIONSHIP */}
@@ -1193,146 +1523,6 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
                     </div>
                 )}
 
-                {/* MODAL: CREATE SNAPSHOT */}
-                {isSnapshotModalOpen && (
-                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
-                        <Card className="w-full max-w-xl bg-card border border-border rounded-none shadow-lg max-h-[90vh] overflow-y-auto relative animate-in zoom-in duration-300 p-6">
-                            <div className="flex items-center justify-between border-b pb-1.5">
-                                <h3 className="font-bold text-lg text-foreground flex items-center gap-2">
-                                    <Clock className="h-5 w-5 text-primary" /> {editingSnapshotId ? "Edit Snapshot" : "Create Snapshot"}
-                                </h3>
-                                <button onClick={() => setIsSnapshotModalOpen(false)} className="text-muted-foreground hover:text-foreground text-xl font-bold">&times;</button>
-                            </div>
-                            
-                            <form onSubmit={handleAddSnapshot} className="space-y-4 -mt-1">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2 col-span-2">
-                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Snapshot Label *</Label>
-                                        <Input
-                                            placeholder="e.g. After Timeskip, Post-Curse"
-                                            value={snapLabel}
-                                            onChange={(e) => setSnapLabel(e.target.value)}
-                                            required
-                                            className="h-10 bg-card/50"
-                                        />
-                                    </div>
-                                    <div className="space-y-2 col-span-2">
-                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Change Notes (Optional)</Label>
-                                        <Textarea
-                                            placeholder="Describe what changed in this version and why..."
-                                            value={snapNote}
-                                            onChange={(e) => setSnapNote(e.target.value)}
-                                            className="bg-card/50 min-h-[60px] resize-none"
-                                        />
-                                    </div>
-                                    
-                                    <div className="space-y-2">
-                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Anchor to Event (Optional)</Label>
-                                        <Select value={snapEventId} onValueChange={setSnapEventId}>
-                                            <SelectTrigger className="bg-card/50 h-10 w-full">
-                                                <SelectValue placeholder="None" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="none">None</SelectItem>
-                                                {events.map(e => {
-                                                    const engine = new CalendarEngine(toCalendarConfig(e.calendar));
-                                                    return (
-                                                        <SelectItem key={e.id} value={e.id}>
-                                                            {e.title} ({engine.formatDate(e.startDate)})
-                                                        </SelectItem>
-                                                    );
-                                                })}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Anchor to Chapter (Optional)</Label>
-                                        <Select value={snapChapterId} onValueChange={setSnapChapterId}>
-                                            <SelectTrigger className="bg-card/50 h-10 w-full">
-                                                <SelectValue placeholder="None" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="none">None</SelectItem>
-                                                {chapters.map(c => (
-                                                    <SelectItem key={c.id} value={c.id}>
-                                                        {c.title}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    <hr className="col-span-2 my-2 border-muted/50" />
-                                    
-                                    <div className="space-y-2">
-                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Name</Label>
-                                        <Input value={snapName} onChange={(e) => setSnapName(e.target.value)} required className="h-10 bg-card/50" />
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Role</Label>
-                                        <Input value={snapRole} onChange={(e) => setSnapRole(e.target.value)} className="h-10 bg-card/50" />
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Age</Label>
-                                        <Input value={snapAge} onChange={(e) => setSnapAge(e.target.value)} className="h-10 bg-card/50" />
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Gender</Label>
-                                        <Input value={snapGender} onChange={(e) => setSnapGender(e.target.value)} className="h-10 bg-card/50" />
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Species</Label>
-                                        <Input value={snapSpecies} onChange={(e) => setSnapSpecies(e.target.value)} className="h-10 bg-card/50" />
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Occupation</Label>
-                                        <Input value={snapOccupation} onChange={(e) => setSnapOccupation(e.target.value)} className="h-10 bg-card/50" />
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Height</Label>
-                                        <Input value={snapHeight} onChange={(e) => setSnapHeight(e.target.value)} className="h-10 bg-card/50" />
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Weight</Label>
-                                        <Input value={snapWeight} onChange={(e) => setSnapWeight(e.target.value)} className="h-10 bg-card/50" />
-                                    </div>
-
-                                    <div className="space-y-2 col-span-2">
-                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Avatar URL</Label>
-                                        <Input value={snapAvatarUrl} onChange={(e) => setSnapAvatarUrl(e.target.value)} placeholder="e.g. image path or external URL" className="h-10 bg-card/50" />
-                                    </div>
-
-                                    <div className="space-y-2 col-span-2">
-                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Personality</Label>
-                                        <Textarea value={snapPersonality} onChange={(e) => setSnapPersonality(e.target.value)} className="bg-card/50 min-h-[60px] resize-none" />
-                                    </div>
-
-                                    <div className="space-y-2 col-span-2">
-                                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Backstory</Label>
-                                        <Textarea value={snapBackstory} onChange={(e) => setSnapBackstory(e.target.value)} className="bg-card/50 min-h-[60px] resize-none" />
-                                    </div>
-                                </div>
-
-                                <div className="flex justify-end gap-3 pt-4 border-t">
-                                    <Button type="button" variant="outline" size="sm" onClick={() => setIsSnapshotModalOpen(false)} disabled={isSnapSaving}>
-                                        Cancel
-                                    </Button>
-                                    <Button type="submit" size="sm" disabled={isSnapSaving || !snapLabel || !snapName}>
-                                        {isSnapSaving ? "Saving..." : (editingSnapshotId ? "Save Changes" : "Create Snapshot")}
-                                    </Button>
-                                </div>
-                            </form>
-                        </Card>
-                    </div>
-                )}
             </div>
         );
     }
@@ -1391,7 +1581,7 @@ export function CharactersClient({ initialCharacters, worldId, storyId, stories 
                                         </div>
                                     )}
 
-                                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10" onClick={(e) => e.stopPropagation()}>
+                                    <div className="absolute top-2 right-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300 z-10" onClick={(e) => e.stopPropagation()}>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
                                                 <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full shadow-lg bg-background/80 backdrop-blur-md border border-white/20">
