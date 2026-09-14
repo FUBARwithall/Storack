@@ -58,6 +58,7 @@ import {
     ChevronUp,
     ChevronDown,
     X,
+    History,
     type LucideIcon
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -72,6 +73,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ExportModal } from "@/components/ExportModal";
+import { VersionHistoryModal } from "@/components/editor/VersionHistoryModal";
 
 interface EditorClientProps {
     story: { id: string; title: string; worldId: string; chapters: any[] };
@@ -93,7 +95,11 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
     const [wordCount, setWordCount] = useState(initialChapter.wordCount);
     const [hasChanges, setHasChanges] = useState(false);
     const [isExportOpen, setIsExportOpen] = useState(false);
-    const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
+
+    const AUTOSAVE_INTERVAL_SEC = 300; // 5 minutes
+    const [secondsLeft, setSecondsLeft] = useState<number>(AUTOSAVE_INTERVAL_SEC);
+    const autosaveTargetRef = useRef<number | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isImageActive, setIsImageActive] = useState(false);
     const [imageAttributes, setImageAttributes] = useState<{ size?: string; align?: string }>({});
@@ -175,6 +181,19 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
             updateImageState(editor);
         },
     });
+
+    const handleRestore = useCallback(
+        (restoredChapter: { title: string; content: string | null; wordCount: number }) => {
+            setTitle(restoredChapter.title);
+            setWordCount(restoredChapter.wordCount);
+            if (editor) {
+                editor.commands.setContent(restoredChapter.content || "");
+            }
+            setHasChanges(false);
+            setSaveStatus("saved");
+        },
+        [editor]
+    );
 
     const navigateSearchResult = useCallback((direction: 'next' | 'prev') => {
         if (!editor) return;
@@ -261,20 +280,50 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
         }
     }, [isSaving, initialChapter.id, story.id, story.worldId, story.chapters.length, title, wordCount, router, editor]);
 
-    // Autosave — debounce 10 detik setelah ada perubahan
+    const handleSaveRef = useRef(handleSave);
+    handleSaveRef.current = handleSave;
+
+    // Autosave countdown timer (5-minute countdown without keystroke resets)
     useEffect(() => {
-        if (!hasChanges || isSaving || initialChapter.id === 'new') return;
+        if (!hasChanges || isSaving || initialChapter.id === 'new') {
+            autosaveTargetRef.current = null;
+            setSecondsLeft(AUTOSAVE_INTERVAL_SEC);
+            return;
+        }
 
-        if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+        // Initialize target timestamp if not set yet
+        if (!autosaveTargetRef.current) {
+            autosaveTargetRef.current = Date.now() + AUTOSAVE_INTERVAL_SEC * 1000;
+            setSecondsLeft(AUTOSAVE_INTERVAL_SEC);
+        }
 
-        autosaveTimer.current = setTimeout(() => {
-            handleSave();
-        }, 300000);
+        const interval = setInterval(() => {
+            if (!autosaveTargetRef.current) return;
+
+            const remainingMs = autosaveTargetRef.current - Date.now();
+            const remainingSec = Math.max(0, Math.ceil(remainingMs / 1000));
+
+            setSecondsLeft(remainingSec);
+
+            if (remainingSec <= 0) {
+                autosaveTargetRef.current = null;
+                handleSaveRef.current();
+            }
+        }, 1000);
 
         return () => {
-            if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+            clearInterval(interval);
         };
-    }, [hasChanges, isSaving, initialChapter.id, handleSave]);
+    }, [hasChanges, isSaving, initialChapter.id]);
+
+    const formatCountdown = (seconds: number) => {
+        const m = Math.floor(seconds / 60);
+        const s = seconds % 60;
+        if (m > 0) {
+            return `${m}m ${s.toString().padStart(2, '0')}s`;
+        }
+        return `${s}s`;
+    };
 
     const handleDelete = useCallback(async () => {
         if (initialChapter.id === 'new') {
@@ -459,6 +508,10 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => setIsVersionHistoryOpen(true)} className="gap-2">
+                                <History className="h-4 w-4" />
+                                Version History
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setIsExportOpen(true)}>Export Manuscript</DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem>Focus Mode</DropdownMenuItem>
@@ -756,12 +809,72 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
                 <div className="flex items-center gap-4">
                     <span>Draft Mode</span>
                     <span>Spellcheck: On</span>
-                    {hasChanges && saveStatus === 'idle' && !isSaving && (
-                        <span className="text-yellow-500">Autosave in 5m...</span>
-                    )}
-                    {saveStatus === 'saving' && (
-                        <span className="text-primary">Autosaving...</span>
-                    )}
+                    {/* Autosave Status Indicator with Circular Loading & Countdown */}
+                    <div className="flex items-center">
+                        {isSaving || saveStatus === 'saving' ? (
+                            <span className="flex items-center gap-1.5 text-primary normal-case font-medium tracking-normal text-[11px]">
+                                <Loader2 className="w-3.5 h-3.5 animate-spin text-primary shrink-0" />
+                                <span>Autosaving...</span>
+                            </span>
+                        ) : saveStatus === 'saved' ? (
+                            <span className="flex items-center gap-1.5 text-emerald-500 normal-case font-medium tracking-normal text-[11px] animate-in fade-in duration-200">
+                                <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                                <span>All changes saved</span>
+                            </span>
+                        ) : saveStatus === 'error' ? (
+                            <button
+                                type="button"
+                                onClick={() => handleSave()}
+                                className="flex items-center gap-1.5 text-rose-500 hover:text-rose-600 normal-case font-medium tracking-normal text-[11px] cursor-pointer"
+                                title="Autosave failed. Click to retry saving."
+                            >
+                                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                <span>Save failed (Retry)</span>
+                            </button>
+                        ) : hasChanges && initialChapter.id !== 'new' ? (
+                            <button
+                                type="button"
+                                onClick={() => handleSave()}
+                                className="flex items-center gap-1.5 text-amber-500 hover:text-amber-400 normal-case font-medium tracking-normal text-[11px] transition-colors cursor-pointer group"
+                                title="Click to save now"
+                            >
+                                <svg className="w-3.5 h-3.5 -rotate-90 shrink-0" viewBox="0 0 16 16">
+                                    <circle
+                                        cx="8"
+                                        cy="8"
+                                        r="5.5"
+                                        className="stroke-amber-500/25"
+                                        strokeWidth="1.75"
+                                        fill="none"
+                                    />
+                                    <circle
+                                        cx="8"
+                                        cy="8"
+                                        r="5.5"
+                                        className="stroke-amber-500 transition-[stroke-dashoffset] duration-500 ease-linear"
+                                        strokeWidth="1.75"
+                                        strokeDasharray={34.55}
+                                        strokeDashoffset={34.55 * (1 - Math.min(1, Math.max(0, (AUTOSAVE_INTERVAL_SEC - secondsLeft) / AUTOSAVE_INTERVAL_SEC)))}
+                                        strokeLinecap="round"
+                                        fill="none"
+                                    />
+                                </svg>
+                                <span>
+                                    Autosave in <span className="font-mono">{formatCountdown(secondsLeft)}</span>
+                                </span>
+                            </button>
+                        ) : hasChanges && initialChapter.id === 'new' ? (
+                            <span className="flex items-center gap-1.5 text-amber-500/80 normal-case font-medium tracking-normal text-[11px]">
+                                <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                                <span>Unsaved new draft</span>
+                            </span>
+                        ) : (
+                            <span className="flex items-center gap-1.5 text-muted-foreground/60 normal-case font-medium tracking-normal text-[11px]">
+                                <Check className="w-3.5 h-3.5 opacity-60 shrink-0" />
+                                <span>All saved</span>
+                            </span>
+                        )}
+                    </div>
                 </div>
                 <div>
                     Storack Editor v1.0
@@ -781,6 +894,16 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
                 currentChapterId={initialChapter.id === 'new' ? undefined : initialChapter.id}
                 currentChapterTitle={title}
                 editorContent={editor?.getHTML()}
+            />
+
+            <VersionHistoryModal
+                isOpen={isVersionHistoryOpen}
+                onClose={() => setIsVersionHistoryOpen(false)}
+                chapterId={initialChapter.id}
+                currentTitle={title}
+                currentContent={editor ? editor.getHTML() : (initialChapter.content || "")}
+                currentWordCount={wordCount}
+                onRestore={handleRestore}
             />
         </div>
     );

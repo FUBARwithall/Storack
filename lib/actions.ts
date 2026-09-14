@@ -514,7 +514,19 @@ export async function createChapter(storyId: string, worldId: string, data: { ti
 }
 
 export async function updateChapter(id: string, data: Partial<{ title: string, content: string, status: string, wordCount: number }>) {
-    await requireOwnedChapter(id);
+    const existingChapter = await requireOwnedChapter(id);
+
+    // If status is changing, automatically take a milestone snapshot
+    if (data.status && data.status !== existingChapter.status) {
+        await createChapterSnapshot(id, {
+            label: `Milestone: Status changed to ${data.status}`,
+            note: `Status changed from "${existingChapter.status}" to "${data.status}"`,
+            type: "milestone",
+            title: data.title ?? existingChapter.title,
+            content: data.content ?? existingChapter.content ?? "",
+            wordCount: data.wordCount ?? existingChapter.wordCount,
+        }).catch((err) => console.error("Failed to create milestone snapshot:", err));
+    }
 
     const chapter = await prisma.chapter.update({
         where: { id },
@@ -543,6 +555,187 @@ export async function updateChapter(id: string, data: Partial<{ title: string, c
     revalidatePath("/");
     revalidatePath(`/stories/${storyId}`);
     return chapter;
+}
+
+export async function createChapterSnapshot(
+    chapterId: string,
+    data?: {
+        label?: string;
+        note?: string;
+        type?: "manual" | "auto-backup" | "milestone";
+        title?: string;
+        content?: string;
+        wordCount?: number;
+    }
+) {
+    const chapter = await requireOwnedChapter(chapterId);
+
+    const type = data?.type || "manual";
+    const label = data?.label?.trim() || (type === "manual" ? `Draft Snapshot - ${new Date().toLocaleString()}` : "Snapshot");
+    const title = data?.title ?? chapter.title;
+    const content = data?.content ?? chapter.content ?? "";
+    const wordCount = data?.wordCount ?? chapter.wordCount;
+    const note = data?.note?.trim() || null;
+
+    // Enforce snapshot caps
+    if (type === "auto-backup") {
+        const autoCount = await prisma.chapterSnapshot.count({
+            where: { chapterId, type: "auto-backup" },
+        });
+        if (autoCount >= 20) {
+            const oldest = await prisma.chapterSnapshot.findMany({
+                where: { chapterId, type: "auto-backup" },
+                orderBy: { createdAt: "asc" },
+                take: autoCount - 19,
+                select: { id: true },
+            });
+            if (oldest.length > 0) {
+                await prisma.chapterSnapshot.deleteMany({
+                    where: { id: { in: oldest.map((s) => s.id) } },
+                });
+            }
+        }
+    } else if (type === "manual") {
+        const manualCount = await prisma.chapterSnapshot.count({
+            where: { chapterId, type: "manual" },
+        });
+        if (manualCount >= 50) {
+            throw new Error("Manual snapshot limit reached (50). Please delete older snapshots before creating a new one.");
+        }
+    }
+
+    const snapshot = await prisma.chapterSnapshot.create({
+        data: {
+            chapterId,
+            label,
+            note,
+            type,
+            title,
+            content,
+            wordCount,
+        },
+    });
+
+    if (chapter.storyId) {
+        revalidatePath(`/stories/${chapter.storyId}/editor/${chapterId}`);
+    }
+    return snapshot;
+}
+
+export async function getChapterSnapshots(chapterId: string) {
+    await requireOwnedChapter(chapterId);
+
+    const snapshots = await prisma.chapterSnapshot.findMany({
+        where: { chapterId },
+        orderBy: { createdAt: "desc" },
+        select: {
+            id: true,
+            label: true,
+            note: true,
+            type: true,
+            title: true,
+            wordCount: true,
+            createdAt: true,
+        },
+    });
+
+    return snapshots;
+}
+
+export async function getChapterSnapshotContent(snapshotId: string) {
+    const snapshot = await prisma.chapterSnapshot.findUnique({
+        where: { id: snapshotId },
+        select: {
+            id: true,
+            chapterId: true,
+            label: true,
+            note: true,
+            type: true,
+            title: true,
+            content: true,
+            wordCount: true,
+            createdAt: true,
+        },
+    });
+
+    if (!snapshot) throw new Error("Snapshot not found");
+    await requireOwnedChapter(snapshot.chapterId);
+
+    return snapshot;
+}
+
+export async function deleteChapterSnapshot(snapshotId: string) {
+    const snapshot = await prisma.chapterSnapshot.findUnique({
+        where: { id: snapshotId },
+        select: { chapterId: true },
+    });
+
+    if (!snapshot) throw new Error("Snapshot not found");
+    await requireOwnedChapter(snapshot.chapterId);
+
+    await prisma.chapterSnapshot.delete({
+        where: { id: snapshotId },
+    });
+
+    return { success: true };
+}
+
+export async function restoreChapterSnapshot(
+    snapshotId: string,
+    currentDraftData?: { title: string; content: string; wordCount: number }
+) {
+    const snapshot = await prisma.chapterSnapshot.findUnique({
+        where: { id: snapshotId },
+    });
+
+    if (!snapshot) throw new Error("Snapshot not found");
+    await requireOwnedChapter(snapshot.chapterId);
+
+    // If current draft data was provided, create an automatic backup first
+    if (currentDraftData) {
+        await createChapterSnapshot(snapshot.chapterId, {
+            label: `Auto-backup before restoring "${snapshot.label}"`,
+            note: `Automatic backup created before restoring version from ${new Date(snapshot.createdAt).toLocaleString()}`,
+            type: "auto-backup",
+            title: currentDraftData.title,
+            content: currentDraftData.content,
+            wordCount: currentDraftData.wordCount,
+        });
+    }
+
+    const updatedChapter = await prisma.chapter.update({
+        where: { id: snapshot.chapterId },
+        data: {
+            title: snapshot.title,
+            content: snapshot.content,
+            wordCount: snapshot.wordCount,
+            lastEdited: new Date(),
+        },
+    });
+
+    const storyId = updatedChapter.storyId;
+    if (storyId) {
+        const chapters = await prisma.chapter.findMany({
+            where: { storyId },
+        });
+        const totalWordCount = chapters.reduce((sum, ch) => sum + ch.wordCount, 0);
+
+        await prisma.story.update({
+            where: { id: storyId },
+            data: {
+                wordCount: totalWordCount,
+                lastEdited: new Date(),
+            },
+        });
+    }
+
+    revalidatePath("/");
+    if (storyId) {
+        revalidatePath(`/stories/${storyId}`);
+        revalidatePath(`/stories/${storyId}/editor/${snapshot.chapterId}`);
+    }
+
+    return updatedChapter;
 }
 
 export async function deleteChapter(id: string, storyId: string) {

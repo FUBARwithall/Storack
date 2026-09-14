@@ -69,9 +69,9 @@ This document tracks planned features and implementation tasks for the Story Tra
 - [ ] Foreshadowing tracker
 
 ### Writing Version Control
-- [ ] Draft snapshots
-- [ ] Diff comparison UI
-- [ ] Restore previous versions
+- [x] Draft snapshots
+- [x] Diff comparison UI
+- [x] Restore previous versions
 
 ### Analytics & Productivity
 - [x] Manuscript Pulse (completion rates & draft depth)

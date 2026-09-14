@@ -134,7 +134,8 @@ model Chapter {
   events    TimelineEvent[]
   characters Character[]
   locations  Location[]
-  snapshots  CharacterSnapshot[]
+  characterSnapshots CharacterSnapshot[]
+  snapshots  ChapterSnapshot[]
 
   createdAt DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
@@ -424,4 +425,22 @@ model WorldObject {
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @default(now()) @updatedAt
+}
+
+// --- Chapter Snapshot (Version Control) ---
+model ChapterSnapshot {
+  id          String   @id @default(cuid())
+  label       String                          // e.g. "Draft 1", "Before climax rework"
+  note        String?  @db.Text               // Optional context on what changed
+  type        String   @default("manual")     // "manual" | "auto-backup" | "milestone"
+  title       String                          // Chapter title at time of snapshot
+  content     String?  @db.Text               // Full HTML content at time of snapshot
+  wordCount   Int      @default(0)
+
+  chapterId   String
+  chapter     Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+
+  @@index([chapterId, createdAt])
 }
