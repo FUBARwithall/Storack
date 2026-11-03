@@ -12,12 +12,26 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL("/auth", request.url));
     }
 
+    // Validate token for protected routes
+    if (session && !isPublicPath) {
+        try {
+            await decrypt(session);
+        } catch {
+            const response = NextResponse.redirect(new URL("/auth", request.url));
+            response.cookies.set("session", "", { expires: new Date(0) });
+            return response;
+        }
+    }
+
     if (session && isPublicPath) {
         try {
             await decrypt(session);
             return NextResponse.redirect(new URL("/", request.url));
-        } catch (e) {
-            // Session invalid, continue to auth
+        } catch {
+            // Session invalid, clear it and continue to auth
+            const response = NextResponse.next();
+            response.cookies.set("session", "", { expires: new Date(0) });
+            return response;
         }
     }
 

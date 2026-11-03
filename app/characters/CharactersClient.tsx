@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Search, Plus, User, MoreHorizontal, Pencil, Trash2, ChevronLeft, Link as LinkIcon, Heart, Calendar as CalendarIcon, Clock, ShieldAlert, Upload, X } from "lucide-react";
+import { Search, Plus, User, MoreHorizontal, Pencil, Trash2, ChevronLeft, Heart, Calendar as CalendarIcon, Clock, ShieldAlert, Upload, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { CharacterForm } from "@/components/characters/CharacterForm";
 import { Input } from "@/components/ui/input";
@@ -76,26 +76,6 @@ function getDisplayState(char: Character) {
         snapshotLabel: ""
     };
 }
-
-const isVerticalType = (type: string): boolean => {
-    const t = type.toLowerCase();
-    return (
-        t.includes("parent") ||
-        t.includes("child") ||
-        t.includes("mentor") ||
-        t.includes("apprentice") ||
-        t.includes("leader") ||
-        t.includes("follower") ||
-        t.includes("boss") ||
-        t.includes("subordinate") ||
-        t.includes("master") ||
-        t.includes("servant") ||
-        t.includes("superior") ||
-        t.includes("underling") ||
-        t.includes("creator") ||
-        t.includes("creation")
-    );
-};
 
 interface Character {
     id: string;
@@ -853,7 +833,6 @@ export function CharactersClient({ initialCharacters, worldId, worldName, storyI
         const sortedAppearances = [...(activeChar.appearances || [])].sort((a, b) => {
             if (!a.event.calendar || !b.event.calendar) return 0;
             const engineA = new CalendarEngine(toCalendarConfig(a.event.calendar));
-            const engineB = new CalendarEngine(toCalendarConfig(b.event.calendar));
             return engineA.compareDates(a.event.startDate, b.event.startDate);
         });
 
@@ -1282,7 +1261,7 @@ export function CharactersClient({ initialCharacters, worldId, worldName, storyI
 
                                                                 {snap.note && (
                                                                     <p className="text-xs text-muted-foreground/90 italic bg-muted/30 px-3 py-2 border rounded">
-                                                                        "{snap.note}"
+                                                                        &ldquo;{snap.note}&rdquo;
                                                                     </p>
                                                                 )}
 
@@ -1455,7 +1434,7 @@ export function CharactersClient({ initialCharacters, worldId, worldName, storyI
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Character's Role *</Label>
+                                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Character&apos;s Role *</Label>
                                     <Select value={appRole} onValueChange={setAppRole}>
                                         <SelectTrigger className="bg-card/50 h-10 w-full">
                                             <SelectValue />

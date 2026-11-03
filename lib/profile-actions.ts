@@ -50,6 +50,12 @@ export async function updateProfileAction(formData: FormData) {
         if (!currentPassword) {
             return { error: "Current password is required to change password" };
         }
+        if (newPassword.length < 8) {
+            return { error: "New password must be at least 8 characters" };
+        }
+        if (newPassword.length > 24) {
+            return { error: "New password must be 24 characters or fewer" };
+        }
         const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
         if (!isPasswordValid) {
             return { error: "Incorrect current password" };
@@ -63,9 +69,14 @@ export async function updateProfileAction(formData: FormData) {
     let uploadBytes = 0;
 
     if (avatarFile && avatarFile.size > 0) {
+        const allowedMimeTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+        if (!allowedMimeTypes.includes(avatarFile.type)) {
+            return { error: "Invalid file type. Only JPEG, PNG, GIF, and WEBP are allowed." };
+        }
+
         if (user.avatarUrl) {
-            const oldFileRecord = await prisma.uploadedFile.findUnique({
-                where: { url: user.avatarUrl }
+            const oldFileRecord = await prisma.uploadedFile.findFirst({
+                where: { url: user.avatarUrl, userId }
             });
             if (oldFileRecord) {
                 oldAvatarSize = oldFileRecord.size;

@@ -3,13 +3,10 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from './generated/prisma';
 
 const prismaClientSingleton = () => {
-    console.log('Initializing new PrismaClient instance...');
     const connectionString = process.env.DATABASE_URL;
     const pool = new Pool({ connectionString });
     const adapter = new PrismaPg(pool);
-    const client = new PrismaClient({ adapter });
-    console.log('Models on new client:', Object.keys(client).filter(k => !k.startsWith('$') && !k.startsWith('_')));
-    return client;
+    return new PrismaClient({ adapter });
 };
 
 type PrismaClientSingleton = ReturnType<typeof prismaClientSingleton>;

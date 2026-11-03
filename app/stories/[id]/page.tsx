@@ -4,12 +4,9 @@ import {
     ArrowLeft,
     FileText,
     Plus,
-    MoreVertical,
     Clock
 } from "lucide-react";
 import { notFound } from "next/navigation";
-import { Card, CardContent } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getCalendars, getStoryById } from "@/lib/actions";

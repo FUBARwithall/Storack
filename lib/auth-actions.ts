@@ -15,6 +15,14 @@ export async function registerAction(formData: FormData) {
         return { error: "Username and password are required" };
     }
 
+    if (password.length < 8) {
+        return { error: "Password must be at least 8 characters" };
+    }
+
+    if (password.length > 24) {
+        return { error: "Password must be 24 characters or fewer" };
+    }
+
     // Start of register rate limit
     const ip = await getClientIp();
     const rl = await rateLimit(`rl:register:${ip}`, 3, 60 * 60 * 1000);
@@ -60,6 +68,10 @@ export async function loginAction(formData: FormData) {
 
     if (!username || !password) {
         return { error: "Username and password are required" };
+    }
+
+    if (password.length > 24) {
+        return { error: "Invalid username or password" };
     }
 
     // Start of login rate limit

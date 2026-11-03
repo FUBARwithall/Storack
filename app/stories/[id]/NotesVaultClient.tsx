@@ -1,11 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef, useTransition } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useState, useEffect, useRef, useTransition, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import {
     FileText,
     Plus,
@@ -16,11 +14,10 @@ import {
     Save,
     Check,
     AlertCircle,
-    ExternalLink
 } from "lucide-react";
 import { createNote, updateNote, deleteNote, uploadResearchFile, deleteResearchFile, deleteUploadedFile } from "@/lib/actions";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { cn, formatBytes } from "@/lib/utils";
 
 interface UploadedFileDto {
     id: string;
@@ -53,11 +50,20 @@ export function NotesVaultClient({ notes: initialNotes, storyId }: NotesVaultCli
     const [activeTab, setActiveTab] = useState<"general" | "research" | "scratchpad">("general");
     const [notes, setNotes] = useState<Note[]>(initialNotes);
     const [selectedNote, setSelectedNote] = useState<Note | null>(null);
+    const [prevSelectedNoteId, setPrevSelectedNoteId] = useState<string | null>(null);
     const [noteTitle, setNoteTitle] = useState("");
     const [noteContent, setNoteContent] = useState("");
-    const [hasChanges, setHasChanges] = useState(false);
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-    const [isPending, startTransition] = useTransition();
+    const [, startTransition] = useTransition();
+
+    // Sync note title and content when selected note changes (React pattern: storing info from previous renders)
+    const currentNoteId = selectedNote ? selectedNote.id : null;
+    if (currentNoteId !== prevSelectedNoteId) {
+        setPrevSelectedNoteId(currentNoteId);
+        setNoteTitle(selectedNote?.title ?? "");
+        setNoteContent(selectedNote?.content || "");
+        setSaveStatus('idle');
+    }
 
     // Link/File states
     const [newLinkUrl, setNewLinkUrl] = useState("");
@@ -67,32 +73,56 @@ export function NotesVaultClient({ notes: initialNotes, storyId }: NotesVaultCli
     // Scratchpad state
     const scratchpad = notes.find(n => n.type === "scratchpad");
     const [scratchContent, setScratchContent] = useState(scratchpad?.content || "");
-    const [scratchHasChanges, setScratchHasChanges] = useState(false);
     const [scratchSaveStatus, setScratchSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+
+    // Derived change tracking
+    const hasChanges = Boolean(selectedNote && (noteTitle !== selectedNote.title || noteContent !== (selectedNote.content || "")));
+    const scratchHasChanges = scratchContent !== (scratchpad?.content || "");
 
     const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const scratchAutosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Setup active note details when selected
-    useEffect(() => {
-        if (selectedNote) {
-            setNoteTitle(selectedNote.title);
-            setNoteContent(selectedNote.content || "");
-            setHasChanges(false);
-            setSaveStatus('idle');
-        } else {
-            setNoteTitle("");
-            setNoteContent("");
-            setHasChanges(false);
-        }
-    }, [selectedNote]);
-
-    // Track changes for active note
-    useEffect(() => {
+    const handleSaveNote = useCallback(async () => {
         if (!selectedNote) return;
-        const changed = noteTitle !== selectedNote.title || noteContent !== (selectedNote.content || "");
-        setHasChanges(changed);
-    }, [noteTitle, noteContent, selectedNote]);
+        setSaveStatus('saving');
+        try {
+            const updated = await updateNote(selectedNote.id, {
+                title: noteTitle,
+                content: noteContent
+            });
+            setNotes(prev => prev.map(n => n.id === selectedNote.id ? updated : n));
+            setSelectedNote(updated);
+            setSaveStatus('saved');
+            setTimeout(() => setSaveStatus('idle'), 2000);
+        } catch (error) {
+            console.error(error);
+            setSaveStatus('error');
+        }
+    }, [selectedNote, noteTitle, noteContent]);
+
+    const handleSaveScratchpad = useCallback(async () => {
+        setScratchSaveStatus('saving');
+        try {
+            if (scratchpad) {
+                const updated = await updateNote(scratchpad.id, {
+                    content: scratchContent
+                });
+                setNotes(prev => prev.map(n => n.id === scratchpad.id ? updated : n));
+            } else {
+                // Create scratchpad if not exists
+                const created = await createNote(storyId, "Scratchpad", "scratchpad");
+                const updated = await updateNote(created.id, {
+                    content: scratchContent
+                });
+                setNotes(prev => [updated, ...prev]);
+            }
+            setScratchSaveStatus('saved');
+            setTimeout(() => setScratchSaveStatus('idle'), 2000);
+        } catch (error) {
+            console.error(error);
+            setScratchSaveStatus('error');
+        }
+    }, [scratchpad, scratchContent, storyId]);
 
     // Active Note Autosave
     useEffect(() => {
@@ -107,7 +137,7 @@ export function NotesVaultClient({ notes: initialNotes, storyId }: NotesVaultCli
         return () => {
             if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
         };
-    }, [hasChanges, noteTitle, noteContent, selectedNote]);
+    }, [hasChanges, selectedNote, handleSaveNote]);
 
     // Scratchpad Autosave
     useEffect(() => {
@@ -122,7 +152,7 @@ export function NotesVaultClient({ notes: initialNotes, storyId }: NotesVaultCli
         return () => {
             if (scratchAutosaveTimer.current) clearTimeout(scratchAutosaveTimer.current);
         };
-    }, [scratchHasChanges, scratchContent]);
+    }, [scratchHasChanges, handleSaveScratchpad]);
 
     const handleCreateNote = async () => {
         startTransition(async () => {
@@ -136,25 +166,6 @@ export function NotesVaultClient({ notes: initialNotes, storyId }: NotesVaultCli
                 toast.error("Failed to create note");
             }
         });
-    };
-
-    const handleSaveNote = async () => {
-        if (!selectedNote) return;
-        setSaveStatus('saving');
-        try {
-            const updated = await updateNote(selectedNote.id, {
-                title: noteTitle,
-                content: noteContent
-            });
-            setNotes(prev => prev.map(n => n.id === selectedNote.id ? updated : n));
-            setSelectedNote(updated);
-            setSaveStatus('saved');
-            setHasChanges(false);
-            setTimeout(() => setSaveStatus('idle'), 2000);
-        } catch (error) {
-            console.error(error);
-            setSaveStatus('error');
-        }
     };
 
     const handleDeleteNote = async (noteId: string) => {
@@ -172,31 +183,6 @@ export function NotesVaultClient({ notes: initialNotes, storyId }: NotesVaultCli
                 toast.error("Failed to delete note");
             }
         });
-    };
-
-    const handleSaveScratchpad = async () => {
-        setScratchSaveStatus('saving');
-        try {
-            if (scratchpad) {
-                const updated = await updateNote(scratchpad.id, {
-                    content: scratchContent
-                });
-                setNotes(prev => prev.map(n => n.id === scratchpad.id ? updated : n));
-            } else {
-                // Create scratchpad if not exists
-                const created = await createNote(storyId, "Scratchpad", "scratchpad");
-                const updated = await updateNote(created.id, {
-                    content: scratchContent
-                });
-                setNotes(prev => [updated, ...prev]);
-            }
-            setScratchSaveStatus('saved');
-            setScratchHasChanges(false);
-            setTimeout(() => setScratchSaveStatus('idle'), 2000);
-        } catch (error) {
-            console.error(error);
-            setScratchSaveStatus('error');
-        }
     };
 
     const handleCreateResearchTopic = async () => {
@@ -345,14 +331,6 @@ export function NotesVaultClient({ notes: initialNotes, storyId }: NotesVaultCli
             console.error(error);
             toast.error("Failed to delete file");
         }
-    };
-
-    const formatBytes = (bytes: number | null) => {
-        if (!bytes) return "0 Bytes";
-        const k = 1024;
-        const sizes = ["Bytes", "KB", "MB", "GB"];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
     };
 
     const generalNotes = notes.filter(n => n.type === "general");
@@ -754,10 +732,7 @@ export function NotesVaultClient({ notes: initialNotes, storyId }: NotesVaultCli
                         </div>
                         <Textarea
                             value={scratchContent}
-                            onChange={e => {
-                                setScratchContent(e.target.value);
-                                setScratchHasChanges(true);
-                            }}
+                            onChange={e => setScratchContent(e.target.value)}
                             placeholder="Write down temporary thoughts..."
                             className="flex-1 w-full min-h-[380px] font-sans text-sm resize-none bg-background focus-visible:ring-0 focus-visible:border-primary border-none p-3 rounded-lg outline-none"
                         />

@@ -6,17 +6,22 @@ export async function rateLimit(key: string, limit: number, windowMs: number): P
     const now = new Date();
     const expiresAt = new Date(now.getTime() + windowMs);
 
-    await prisma.rateLimit.deleteMany({
-        where: { expiresAt: { lt: now } }
-    });
+    // Probabilistic cleanup (~5% of requests) to avoid DB write contention
+    if (Math.random() < 0.05) {
+        await prisma.rateLimit.deleteMany({
+            where: { expiresAt: { lt: now } }
+        }).catch(() => {});
+    }
 
     const record = await prisma.rateLimit.findUnique({
         where: { key }
     });
 
-    if (!record) {
-        await prisma.rateLimit.create({
-            data: { key, count: 1, expiresAt }
+    if (!record || record.expiresAt < now) {
+        await prisma.rateLimit.upsert({
+            where: { key },
+            create: { key, count: 1, expiresAt },
+            update: { count: 1, expiresAt },
         });
         return { success: true };
     }

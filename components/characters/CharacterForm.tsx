@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { createCharacter, updateCharacter } from "@/lib/actions";
-import { Loader2, Upload, X, UserCircle, ChevronLeft } from "lucide-react";
+import { Loader2, Upload, X, ChevronLeft } from "lucide-react";
 import { DEFAULT_CALENDAR } from "@/lib/calendar-engine";
 
 interface CharacterFormProps {

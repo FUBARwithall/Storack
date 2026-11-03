@@ -94,7 +94,6 @@ export function Sidebar({
     const [activeWorld, setActiveWorldState] = useState<any>(null);
     const [isCreatingWorld, setIsCreatingWorld] = useState(false);
     const [newWorldName, setNewWorldName] = useState("");
-    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         if (!user) return;
@@ -108,8 +107,6 @@ export function Sidebar({
                 setActiveWorldState(currWorld);
             } catch (err) {
                 console.error("Failed to load worlds:", err);
-            } finally {
-                setIsLoading(false);
             }
         }
         loadWorlds();
@@ -356,7 +353,6 @@ export function MobileNav({
     const [activeWorld, setActiveWorldState] = useState<any>(null);
     const [isCreatingWorld, setIsCreatingWorld] = useState(false);
     const [newWorldName, setNewWorldName] = useState("");
-    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         if (!user) return;
@@ -370,8 +366,6 @@ export function MobileNav({
                 setActiveWorldState(currWorld);
             } catch (err) {
                 console.error("Failed to load worlds:", err);
-            } finally {
-                setIsLoading(false);
             }
         }
         loadWorlds();

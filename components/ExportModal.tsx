@@ -174,7 +174,7 @@ export function ExportModal({
                             <Label htmlFor="scope" className="text-right text-xs">
                                 Scope
                             </Label>
-                            <Select value={scope} onValueChange={(val: any) => setScope(val)}>
+                            <Select value={scope} onValueChange={(val) => setScope(val as "chapter" | "story")}>
                                 <SelectTrigger className="col-span-3 text-xs">
                                     <SelectValue />
                                 </SelectTrigger>
@@ -191,7 +191,7 @@ export function ExportModal({
                         <Label htmlFor="format" className="text-right text-xs">
                             Format
                         </Label>
-                        <Select value={format} onValueChange={(val: any) => setFormat(val)}>
+                        <Select value={format} onValueChange={(val) => setFormat(val as "markdown" | "pdf")}>
                             <SelectTrigger className="col-span-3 text-xs">
                                 <SelectValue />
                             </SelectTrigger>
@@ -210,7 +210,7 @@ export function ExportModal({
                                 <Label htmlFor="font" className="text-right text-xs">
                                     Typography
                                 </Label>
-                                <Select value={font} onValueChange={(val: any) => setFont(val)}>
+                                <Select value={font} onValueChange={(val) => setFont(val as "serif" | "sans")}>
                                     <SelectTrigger className="col-span-3 text-xs">
                                         <SelectValue />
                                     </SelectTrigger>
@@ -226,7 +226,7 @@ export function ExportModal({
                                 <Label htmlFor="spacing" className="text-right text-xs">
                                     Spacing
                                 </Label>
-                                <Select value={spacing} onValueChange={(val: any) => setSpacing(val)}>
+                                <Select value={spacing} onValueChange={(val) => setSpacing(val as "single" | "double")}>
                                     <SelectTrigger className="col-span-3 text-xs">
                                         <SelectValue />
                                     </SelectTrigger>

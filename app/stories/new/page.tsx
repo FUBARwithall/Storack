@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, BookOpen, Upload, Image as ImageIcon, Loader2, X } from "lucide-react";
+import { ArrowLeft, BookOpen, Image as ImageIcon, Loader2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState, useRef } from "react";

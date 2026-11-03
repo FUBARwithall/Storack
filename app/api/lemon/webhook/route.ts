@@ -28,7 +28,6 @@ export async function POST(request: Request) {
         }
 
         const payload = JSON.parse(rawBody);
-        const eventName = payload.meta.event_name;
         const customData = payload.meta.custom_data;
         const userId = customData?.userId || customData?.user_id;
 

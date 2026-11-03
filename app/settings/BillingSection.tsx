@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { PLANS, PlanKey } from "@/lib/quota";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { deleteUploadedFile } from "@/lib/actions";
-import { Cloud, HardDrive, Trash2, ShieldCheck, Zap } from "lucide-react";
+import { deleteUploadedFile, cleanupOrphanedFiles } from "@/lib/actions";
+import { Cloud, HardDrive, Trash2, ShieldCheck, Zap, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { formatBytes } from "@/lib/utils";
 
 interface UploadedFileDto {
     id: string;
@@ -25,27 +27,20 @@ interface BillingSectionProps {
 }
 
 export function BillingSection({
-    userId,
     plan,
     storageUsedBytes,
     uploadedFiles: initialFiles,
     checkoutUrl
 }: BillingSectionProps) {
+    const router = useRouter();
     const [files, setFiles] = useState<UploadedFileDto[]>(initialFiles);
     const [usedBytes, setUsedBytes] = useState(storageUsedBytes);
     const [deletingUrl, setDeletingUrl] = useState<string | null>(null);
+    const [isCleaning, setIsCleaning] = useState(false);
 
     const planKey = (plan as PlanKey) || "free";
     const currentLimit = PLANS[planKey];
     const percentage = Math.min((usedBytes / currentLimit.maxBytes) * 100, 100);
-
-    const formatBytes = (bytes: number) => {
-        if (bytes === 0) return "0 Bytes";
-        const k = 1024;
-        const sizes = ["Bytes", "KB", "MB", "GB"];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-    };
 
     const handleDelete = async (url: string) => {
         if (deletingUrl) return;
@@ -65,6 +60,26 @@ export function BillingSection({
             toast.error("Failed to delete file.");
         } finally {
             setDeletingUrl(null);
+        }
+    };
+
+    const handleCleanOrphans = async () => {
+        if (isCleaning) return;
+        setIsCleaning(true);
+        try {
+            const res = await cleanupOrphanedFiles();
+            if (res.count > 0) {
+                setUsedBytes(prev => Math.max(0, prev - res.reclaimedBytes));
+                toast.success(`Cleaned up ${res.count} unused file(s) and reclaimed ${formatBytes(res.reclaimedBytes)}!`);
+                router.refresh();
+            } else {
+                toast.info("No unused media files found.");
+            }
+        } catch (err) {
+            console.error(err);
+            toast.error("Failed to clean up unused files.");
+        } finally {
+            setIsCleaning(false);
         }
     };
 
@@ -119,11 +134,25 @@ export function BillingSection({
 
             {/* Media Manager / File Deletion */}
             <div className="p-6 bg-card border rounded-xl space-y-4">
-                <div>
-                    <h4 className="font-medium text-foreground text-sm">Manage Uploaded Media</h4>
-                    <p className="text-xs text-muted-foreground">
-                        Covers and editor images are stored in the cloud. Delete unused files to free up space.
-                    </p>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                        <h4 className="font-medium text-foreground text-sm">Manage Uploaded Media</h4>
+                        <p className="text-xs text-muted-foreground">
+                            Covers, avatars, and media files stored in the cloud. Delete or purge unused files to free up space.
+                        </p>
+                    </div>
+                    {files.length > 0 && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleCleanOrphans}
+                            disabled={isCleaning}
+                            className="text-xs shrink-0 self-start sm:self-auto h-8 gap-1.5"
+                        >
+                            <Sparkles className="h-3.5 w-3.5 text-primary" />
+                            {isCleaning ? "Cleaning..." : "Clean Unused Media"}
+                        </Button>
+                    )}
                 </div>
 
                 {files.length === 0 ? (
@@ -147,7 +176,7 @@ export function BillingSection({
                                             >
                                                 {filename}
                                             </a>
-                                            <span className="text-xs text-muted-foreground block mt-0.5">
+                                            <span className="text-xs text-muted-foreground block mt-0.5" suppressHydrationWarning>
                                                 Uploaded {new Date(file.createdAt).toLocaleDateString()} • {formatBytes(file.size)}
                                             </span>
                                         </div>

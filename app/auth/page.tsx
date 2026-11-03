@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BookOpen, Lock, User, Eye, EyeOff } from "lucide-react";
+import { Lock, User, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { loginAction, registerAction } from "@/lib/auth-actions";
 import authBg from "@/public/auth-bg.png";
@@ -14,7 +14,7 @@ export default function AuthPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
 
-    async function handleSubmit(e: React.FormEvent<HTMLFormElement>, action: (formData: FormData) => Promise<any>) {
+    async function handleSubmit(e: React.FormEvent<HTMLFormElement>, action: (formData: FormData) => Promise<{ error?: string } | void>) {
         e.preventDefault();
         setIsLoading(true);
 
@@ -96,16 +96,8 @@ export default function AuthPage() {
                                             </button>
                                         </div>
 
-                                        {/* Remember Me & Forgot Password Utilities */}
-                                        <div className="flex items-center justify-between text-xs mt-1 px-0.5">
-                                            <label className="flex items-center gap-1.5 text-slate-400 cursor-pointer select-none">
-                                                <input
-                                                    type="checkbox"
-                                                    name="rememberMe"
-                                                    className="accent-primary h-3.5 w-3.5 rounded border-white/10 bg-black/20 focus:ring-0 focus:ring-offset-0"
-                                                />
-                                                <span>Remember me</span>
-                                            </label>
+                                        {/* Forgot Password Utility */}
+                                        <div className="flex justify-end text-xs mt-1 px-0.5">
                                             <button
                                                 type="button"
                                                 className="text-primary hover:underline font-semibold"

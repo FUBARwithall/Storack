@@ -35,7 +35,7 @@ export default async function ExportPrintPage({
 }) {
     const { id } = await params;
     const { chapterId, font = "serif", spacing = "double", cover = "true", breaks = "true" } = await searchParams;
-    const userId = await requireUserId();
+    await requireUserId();
 
     const story = await getStoryById(id);
     if (!story) {

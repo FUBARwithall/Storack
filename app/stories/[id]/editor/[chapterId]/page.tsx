@@ -44,6 +44,8 @@ export default async function EditorPage({ params }: { params: Promise<{ id: str
                 id: story.id,
                 title: story.title,
                 worldId: story.worldId,
+                genre: story.genre,
+                synopsis: story.synopsis,
                 chapters: story.chapters
             }}
             chapter={chapter}

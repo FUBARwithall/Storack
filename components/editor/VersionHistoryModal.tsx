@@ -534,7 +534,7 @@ export function VersionHistoryModal({
                   <Clock className="w-8 h-8 stroke-[1.5] mb-2 opacity-40" />
                   <p className="text-xs font-medium">No snapshots yet</p>
                   <p className="text-[11px] text-muted-foreground mt-0.5">
-                    Click "Take Snapshot Now" to record your first revision.
+                    Click &ldquo;Take Snapshot Now&rdquo; to record your first revision.
                   </p>
                 </div>
               ) : (
@@ -568,7 +568,7 @@ export function VersionHistoryModal({
 
                       {item.note && (
                         <p className="text-[11px] text-muted-foreground line-clamp-2 mt-1 italic">
-                          "{item.note}"
+                          &ldquo;{item.note}&rdquo;
                         </p>
                       )}
 
@@ -1016,7 +1016,7 @@ export function VersionHistoryModal({
             </div>
             <DialogDescription className="text-xs text-muted-foreground leading-normal">
               This will overwrite your current editor draft with the version saved as{" "}
-              <strong className="text-foreground font-medium">"{activeSnapshot?.label}"</strong>.
+              <strong className="text-foreground font-medium">&ldquo;{activeSnapshot?.label}&rdquo;</strong>.
             </DialogDescription>
           </DialogHeader>
 
@@ -1026,7 +1026,7 @@ export function VersionHistoryModal({
               Automatic Safety Backup
             </div>
             <p className="text-[11px] text-muted-foreground leading-relaxed">
-              Don't worry — an automatic backup of your live draft will be created before restoring, so no work is permanently lost.
+              Don&apos;t worry — an automatic backup of your live draft will be created before restoring, so no work is permanently lost.
             </p>
           </div>
 

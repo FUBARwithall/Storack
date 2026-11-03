@@ -1,15 +1,14 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CalendarEngine, CustomDate, DEFAULT_CALENDAR, CalendarConfig, MonthConfig, WeekDayConfig, RecurringEvent } from "@/lib/calendar-engine";
-import { Calendar as CalendarIcon, Clock, ChevronLeft, ChevronRight, Plus, Trash, Settings, Save, X, Snowflake, Sun, Pencil } from 'lucide-react';
+import { CalendarEngine, CustomDate, DEFAULT_CALENDAR, CalendarConfig } from "@/lib/calendar-engine";
+import { Calendar as CalendarIcon, Clock, ChevronLeft, ChevronRight, Plus, Trash, Save, X, Pencil } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { createCalendar, createEvent, getEvents, deleteCalendar, updateChapterDates, deleteEvent, updateEvent } from "@/lib/actions";
-import { useEffect } from "react";
 
 const FANTASY_CALENDAR: CalendarConfig = {
     ...DEFAULT_CALENDAR,
@@ -69,40 +68,31 @@ const TEMPLATE_CALENDAR: CalendarConfig = {
 
 export function CalendarWidget({ chapters = [], worldId, initialCalendars = [] }: { chapters?: { id: string; title: string; order: number; date?: any }[], worldId: string, initialCalendars?: CalendarConfig[] }) {
     const [availableCalendars, setAvailableCalendars] = useState<CalendarConfig[]>(initialCalendars);
-    const [localChapters, setLocalChapters] = useState<{ id: string; title: string; order: number; date?: CustomDate[] }[]>(
+    const [prevChapters, setPrevChapters] = useState(chapters);
+    const [localChapters, setLocalChapters] = useState<{ id: string; title: string; order: number; date?: CustomDate[] }[]>(() =>
         chapters.map(ch => ({
             ...ch,
             date: Array.isArray(ch.date) ? ch.date : (ch.date ? [ch.date] : [])
         }))
     );
 
-    useEffect(() => {
+    if (prevChapters !== chapters) {
+        setPrevChapters(chapters);
         setLocalChapters(chapters.map(ch => ({
             ...ch,
             date: Array.isArray(ch.date) ? ch.date : (ch.date ? [ch.date] : [])
         })));
-    }, [chapters]);
+    }
 
     // Default to the first available calendar or null
     const [selectedCalendarId, setSelectedCalendarId] = useState<string | null>(
         initialCalendars.length > 0 ? initialCalendars[0].id : null
     );
 
-    const [selectedCalendar, setSelectedCalendar] = useState<CalendarConfig | null>(
-        initialCalendars.length > 0 ? initialCalendars[0] : null
-    );
-
-    // Update selectedCalendar whenever ID or availableCalendars changes
-    useEffect(() => {
-        if (selectedCalendarId) {
-            const found = availableCalendars.find(c => c.id === selectedCalendarId);
-            if (found) setSelectedCalendar(found);
-        } else if (availableCalendars.length > 0) {
-            setSelectedCalendarId(availableCalendars[0].id);
-        } else {
-            setSelectedCalendar(null);
-        }
-    }, [selectedCalendarId, availableCalendars]);
+    const activeCalendarId = selectedCalendarId || (availableCalendars.length > 0 ? availableCalendars[0].id : null);
+    const selectedCalendar = useMemo(() => {
+        return availableCalendars.find(c => c.id === activeCalendarId) || null;
+    }, [availableCalendars, activeCalendarId]);
 
     // View State
     const [viewMode, setViewMode] = useState<'timeline' | 'create'>(initialCalendars.length > 0 ? 'timeline' : 'create');
@@ -218,19 +208,6 @@ export function CalendarWidget({ chapters = [], worldId, initialCalendars = [] }
             id: `custom-${Date.now()}`,
             name: `${config.name} Copy`
         });
-    };
-
-    // Navigation Handlers
-    const handleNextDay = () => {
-        if (!engine) return;
-        const currentAbs = engine.dateToAbsoluteDays(currentDate);
-        setCurrentDate(engine.absoluteDaysToDate(currentAbs + 1));
-    };
-
-    const handlePrevDay = () => {
-        if (!engine) return;
-        const currentAbs = engine.dateToAbsoluteDays(currentDate);
-        setCurrentDate(engine.absoluteDaysToDate(currentAbs - 1));
     };
 
     const handleDateChange = (field: keyof CustomDate, value: number) => {

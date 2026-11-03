@@ -19,7 +19,7 @@ export function htmlToPlainParagraphs(html: string): string[] {
   if (!html) return [];
 
   // Replace block element tags with newlines
-  let text = html
+  const text = html
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/(p|div|h[1-6]|blockquote|li|tr|section|article)>/gi, '\n')
     .replace(/<hr\s*\/?>/gi, '\n')

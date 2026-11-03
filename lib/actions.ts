@@ -255,6 +255,13 @@ export async function getCalendars(worldId: string) {
 export async function createCalendar(worldId: string, config: CalendarConfig) {
     await requireOwnedWorld(worldId);
 
+    if (!config.months || config.months.length === 0) {
+        throw new Error("Calendar must have at least one month");
+    }
+    if (config.months.some((m) => !m.name || m.days <= 0)) {
+        throw new Error("All months must have a name and at least 1 day");
+    }
+
     // Extract config fields to store in JSON
     const configData = {
         months: config.months,
@@ -791,8 +798,8 @@ async function handleImageUploadAndTracking(
     let oldUploadedFileId = null;
 
     if (oldUrl) {
-        const oldFileRecord = await prisma.uploadedFile.findUnique({
-            where: { url: oldUrl }
+        const oldFileRecord = await prisma.uploadedFile.findFirst({
+            where: { url: oldUrl, userId }
         });
         if (oldFileRecord) {
             oldFileSize = oldFileRecord.size;
@@ -850,6 +857,32 @@ async function handleImageUploadAndTracking(
     return { url: imageUrl, sizeDelta: uploadedBytes - oldFileSize };
 }
 
+export async function cleanupTrackedImage(userId: string, oldUrl: string | null | undefined) {
+    if (!oldUrl) return;
+    const fileRecord = await prisma.uploadedFile.findFirst({
+        where: { url: oldUrl, userId }
+    });
+    if (fileRecord) {
+        try {
+            const parts = oldUrl.split("/storack/");
+            if (parts.length > 1) {
+                const pathWithExtension = "storack/" + parts[1];
+                const publicId = pathWithExtension.split(".")[0];
+                await cloudinary.uploader.destroy(publicId);
+            }
+        } catch (err) {
+            console.error("Failed to delete old image from Cloudinary:", err);
+        }
+        await prisma.$transaction([
+            prisma.uploadedFile.delete({ where: { id: fileRecord.id } }),
+            prisma.user.update({
+                where: { id: userId },
+                data: { storageUsedBytes: { decrement: fileRecord.size } }
+            })
+        ]);
+    }
+}
+
 // --- Characters ---
 export async function createCharacter(worldId: string, data: {
     name: string,
@@ -865,11 +898,20 @@ export async function createCharacter(worldId: string, data: {
     height?: string | null,
     weight?: string | null,
     birthplaceId?: string | null,
-    birthdate?: any,
-    deathdate?: any
+    birthdate?: CustomDate | null,
+    deathdate?: CustomDate | null
 }) {
     await requireOwnedWorld(worldId);
     const userId = await requireUserId();
+
+    if (data.storyId) {
+        const story = await prisma.story.findFirst({ where: { id: data.storyId, worldId } });
+        if (!story) throw new Error("Story not found in this world");
+    }
+    if (data.birthplaceId) {
+        const loc = await prisma.location.findFirst({ where: { id: data.birthplaceId, worldId } });
+        if (!loc) throw new Error("Location not found in this world");
+    }
 
     let finalAvatarUrl = data.avatarUrl;
     if (data.avatarUrl && data.avatarUrl.startsWith("data:")) {
@@ -883,10 +925,13 @@ export async function createCharacter(worldId: string, data: {
         finalAvatarUrl = upload.url;
     }
 
+    const { birthdate, deathdate, ...restData } = data;
     const char = await prisma.character.create({
         data: {
             worldId,
-            ...data,
+            ...restData,
+            birthdate: birthdate ? (birthdate as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
+            deathdate: deathdate ? (deathdate as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
             avatarUrl: finalAvatarUrl
         }
     });
@@ -901,7 +946,7 @@ export async function createCharacter(worldId: string, data: {
 export async function updateCharacter(id: string, data: Partial<{
     name: string,
     role: string,
-    avatarUrl: string,
+    avatarUrl: string | null,
     age: string,
     gender: string,
     species: string,
@@ -912,13 +957,22 @@ export async function updateCharacter(id: string, data: Partial<{
     height: string | null,
     weight: string | null,
     birthplaceId: string | null,
-    birthdate: any,
-    deathdate: any
+    birthdate: CustomDate | null,
+    deathdate: CustomDate | null
 }>) {
     const char = await requireOwnedCharacter(id);
     const userId = await requireUserId();
 
-    let finalAvatarUrl = data.avatarUrl;
+    if (data.storyId) {
+        const story = await prisma.story.findFirst({ where: { id: data.storyId, worldId: char.worldId } });
+        if (!story) throw new Error("Story not found in this world");
+    }
+    if (data.birthplaceId) {
+        const loc = await prisma.location.findFirst({ where: { id: data.birthplaceId, worldId: char.worldId } });
+        if (!loc) throw new Error("Location not found in this world");
+    }
+
+    let finalAvatarUrl: string | null | undefined = data.avatarUrl;
     if (data.avatarUrl && data.avatarUrl.startsWith("data:")) {
         const upload = await handleImageUploadAndTracking(
             userId,
@@ -928,15 +982,27 @@ export async function updateCharacter(id: string, data: Partial<{
             `char-${id}`
         );
         finalAvatarUrl = upload.url;
+    } else if (data.avatarUrl === "" || data.avatarUrl === null) {
+        if (char.avatarUrl) {
+            await cleanupTrackedImage(userId, char.avatarUrl);
+        }
+        finalAvatarUrl = null;
     }
 
     const oldChar = await prisma.character.findUnique({ where: { id }, select: { storyId: true } });
 
+    const { birthdate, deathdate, ...restData } = data;
     const updatedChar = await prisma.character.update({
         where: { id },
         data: {
-            ...data,
-            avatarUrl: finalAvatarUrl
+            ...restData,
+            ...(birthdate !== undefined && {
+                birthdate: birthdate ? (birthdate as unknown as Prisma.InputJsonValue) : Prisma.JsonNull
+            }),
+            ...(deathdate !== undefined && {
+                deathdate: deathdate ? (deathdate as unknown as Prisma.InputJsonValue) : Prisma.JsonNull
+            }),
+            ...(finalAvatarUrl !== undefined && { avatarUrl: finalAvatarUrl })
         }
     });
     revalidatePath("/characters");
@@ -955,28 +1021,7 @@ export async function deleteCharacter(id: string) {
     const userId = await requireUserId();
 
     if (char.avatarUrl) {
-        const fileRecord = await prisma.uploadedFile.findUnique({
-            where: { url: char.avatarUrl }
-        });
-        if (fileRecord) {
-            try {
-                const parts = char.avatarUrl.split("/storack/");
-                if (parts.length > 1) {
-                    const pathWithExtension = "storack/" + parts[1];
-                    const publicId = pathWithExtension.split(".")[0];
-                    await cloudinary.uploader.destroy(publicId);
-                }
-            } catch (err) {
-                console.error(err);
-            }
-            await prisma.$transaction([
-                prisma.uploadedFile.delete({ where: { id: fileRecord.id } }),
-                prisma.user.update({
-                    where: { id: userId },
-                    data: { storageUsedBytes: { decrement: fileRecord.size } }
-                })
-            ]);
-        }
+        await cleanupTrackedImage(userId, char.avatarUrl);
     }
 
     await prisma.character.delete({ where: { id } });
@@ -1134,8 +1179,8 @@ export async function addCharacterSnapshot(worldId: string, data: {
     height?: string | null;
     weight?: string | null;
     birthplaceId?: string | null;
-    birthdate?: any;
-    deathdate?: any;
+    birthdate?: CustomDate | null;
+    deathdate?: CustomDate | null;
 }) {
     await requireOwnedWorld(worldId);
 
@@ -1143,6 +1188,23 @@ export async function addCharacterSnapshot(worldId: string, data: {
         where: { id: data.characterId }
     });
     if (!character || character.worldId !== worldId) throw new Error("Character not found");
+
+    const eventId = data.eventId && data.eventId !== "none" ? data.eventId : null;
+    const chapterId = data.chapterId && data.chapterId !== "none" ? data.chapterId : null;
+    const birthplaceId = data.birthplaceId && data.birthplaceId !== "none" ? data.birthplaceId : null;
+
+    if (eventId) {
+        const ev = await prisma.timelineEvent.findFirst({ where: { id: eventId, worldId } });
+        if (!ev) throw new Error("Event not found in this world");
+    }
+    if (chapterId) {
+        const ch = await prisma.chapter.findFirst({ where: { id: chapterId, worldId } });
+        if (!ch) throw new Error("Chapter not found in this world");
+    }
+    if (birthplaceId) {
+        const loc = await prisma.location.findFirst({ where: { id: birthplaceId, worldId } });
+        if (!loc) throw new Error("Location not found in this world");
+    }
 
     const snapshot = await prisma.characterSnapshot.create({
         data: {
@@ -1158,13 +1220,13 @@ export async function addCharacterSnapshot(worldId: string, data: {
             personality: data.personality || null,
             backstory: data.backstory || null,
             avatarUrl: data.avatarUrl || null,
-            eventId: data.eventId && data.eventId !== "none" ? data.eventId : null,
-            chapterId: data.chapterId && data.chapterId !== "none" ? data.chapterId : null,
+            eventId,
+            chapterId,
             height: data.height || null,
             weight: data.weight || null,
-            birthplaceId: data.birthplaceId && data.birthplaceId !== "none" ? data.birthplaceId : null,
-            birthdate: data.birthdate || null,
-            deathdate: data.deathdate || null,
+            birthplaceId,
+            birthdate: data.birthdate ? (data.birthdate as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
+            deathdate: data.deathdate ? (data.deathdate as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
         }
     });
 
@@ -1205,8 +1267,8 @@ export async function updateCharacterSnapshot(worldId: string, snapshotId: strin
     height?: string | null;
     weight?: string | null;
     birthplaceId?: string | null;
-    birthdate?: any;
-    deathdate?: any;
+    birthdate?: CustomDate | null;
+    deathdate?: CustomDate | null;
 }) {
     await requireOwnedWorld(worldId);
 
@@ -1215,6 +1277,23 @@ export async function updateCharacterSnapshot(worldId: string, snapshotId: strin
         include: { character: true }
     });
     if (!snapshot || snapshot.character.worldId !== worldId) throw new Error("Snapshot not found");
+
+    const eventId = data.eventId && data.eventId !== "none" ? data.eventId : null;
+    const chapterId = data.chapterId && data.chapterId !== "none" ? data.chapterId : null;
+    const birthplaceId = data.birthplaceId && data.birthplaceId !== "none" ? data.birthplaceId : null;
+
+    if (eventId) {
+        const ev = await prisma.timelineEvent.findFirst({ where: { id: eventId, worldId } });
+        if (!ev) throw new Error("Event not found in this world");
+    }
+    if (chapterId) {
+        const ch = await prisma.chapter.findFirst({ where: { id: chapterId, worldId } });
+        if (!ch) throw new Error("Chapter not found in this world");
+    }
+    if (birthplaceId) {
+        const loc = await prisma.location.findFirst({ where: { id: birthplaceId, worldId } });
+        if (!loc) throw new Error("Location not found in this world");
+    }
 
     const updated = await prisma.characterSnapshot.update({
         where: { id: snapshotId },
@@ -1230,13 +1309,13 @@ export async function updateCharacterSnapshot(worldId: string, snapshotId: strin
             personality: data.personality || null,
             backstory: data.backstory || null,
             avatarUrl: data.avatarUrl || null,
-            eventId: data.eventId && data.eventId !== "none" ? data.eventId : null,
-            chapterId: data.chapterId && data.chapterId !== "none" ? data.chapterId : null,
+            eventId,
+            chapterId,
             height: data.height || null,
             weight: data.weight || null,
-            birthplaceId: data.birthplaceId && data.birthplaceId !== "none" ? data.birthplaceId : null,
-            birthdate: data.birthdate || null,
-            deathdate: data.deathdate || null,
+            birthplaceId,
+            birthdate: data.birthdate ? (data.birthdate as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
+            deathdate: data.deathdate ? (data.deathdate as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
         }
     });
 
@@ -1249,6 +1328,16 @@ export async function updateCharacterSnapshot(worldId: string, snapshotId: strin
 export async function createLocation(worldId: string, data: { name: string, type?: string, description?: string, mapUrl?: string, imageUrl?: string, storyId?: string | null, parentId?: string | null }) {
     await requireOwnedWorld(worldId);
     const userId = await requireUserId();
+
+    const parentId = data.parentId && data.parentId !== "none" ? data.parentId : null;
+    if (data.storyId) {
+        const story = await prisma.story.findFirst({ where: { id: data.storyId, worldId } });
+        if (!story) throw new Error("Story not found in this world");
+    }
+    if (parentId) {
+        const parentLoc = await prisma.location.findFirst({ where: { id: parentId, worldId } });
+        if (!parentLoc) throw new Error("Parent location not found in this world");
+    }
 
     let finalImageUrl = data.imageUrl;
     if (data.imageUrl && data.imageUrl.startsWith("data:")) {
@@ -1283,7 +1372,7 @@ export async function createLocation(worldId: string, data: { name: string, type
             imageUrl: finalImageUrl,
             mapUrl: finalMapUrl,
             storyId: data.storyId,
-            parentId: data.parentId && data.parentId !== "none" ? data.parentId : null
+            parentId
         }
     });
     revalidatePath("/world");
@@ -1293,21 +1382,24 @@ export async function createLocation(worldId: string, data: { name: string, type
     return loc;
 }
 
-export async function updateLocation(id: string, data: Partial<{ name: string, type: string, description: string, mapUrl: string, imageUrl: string, storyId: string | null, parentId?: string | null }>) {
+export async function updateLocation(id: string, data: Partial<{ name: string, type: string, description: string, mapUrl: string | null, imageUrl: string | null, storyId: string | null, parentId?: string | null }>) {
     const loc = await requireOwnedLocation(id);
     const userId = await requireUserId();
 
-    if (data.parentId && data.parentId !== "none") {
-        if (data.parentId === id) {
+    const parentId = data.parentId && data.parentId !== "none" ? data.parentId : null;
+    if (parentId) {
+        if (parentId === id) {
             throw new Error("A location cannot be its own parent.");
         }
+        const parentLoc = await prisma.location.findFirst({ where: { id: parentId, worldId: loc.worldId } });
+        if (!parentLoc) throw new Error("Parent location not found in this world");
         
-        let currentParentId: string | null = data.parentId;
+        let currentParentId: string | null = parentId;
         while (currentParentId) {
-            const parentLocationData: { parentId: string | null } | null = (await prisma.location.findUnique({
+            const parentLocationData: { parentId: string | null } | null = await prisma.location.findUnique({
                 where: { id: currentParentId },
                 select: { parentId: true }
-            })) as any;
+            });
             if (!parentLocationData) break;
             if (parentLocationData.parentId === id) {
                 throw new Error("Circular reference detected: Parent cannot be a descendant of this location.");
@@ -1316,7 +1408,12 @@ export async function updateLocation(id: string, data: Partial<{ name: string, t
         }
     }
 
-    let finalImageUrl = data.imageUrl;
+    if (data.storyId) {
+        const story = await prisma.story.findFirst({ where: { id: data.storyId, worldId: loc.worldId } });
+        if (!story) throw new Error("Story not found in this world");
+    }
+
+    let finalImageUrl: string | null | undefined = data.imageUrl;
     if (data.imageUrl && data.imageUrl.startsWith("data:")) {
         const upload = await handleImageUploadAndTracking(
             userId,
@@ -1326,9 +1423,14 @@ export async function updateLocation(id: string, data: Partial<{ name: string, t
             `loc-img-${id}`
         );
         finalImageUrl = upload.url;
+    } else if (data.imageUrl === "" || data.imageUrl === null) {
+        if (loc.imageUrl) {
+            await cleanupTrackedImage(userId, loc.imageUrl);
+        }
+        finalImageUrl = null;
     }
 
-    let finalMapUrl = data.mapUrl;
+    let finalMapUrl: string | null | undefined = data.mapUrl;
     if (data.mapUrl && data.mapUrl.startsWith("data:")) {
         const upload = await handleImageUploadAndTracking(
             userId,
@@ -1338,17 +1440,23 @@ export async function updateLocation(id: string, data: Partial<{ name: string, t
             `loc-map-${id}`
         );
         finalMapUrl = upload.url;
+    } else if (data.mapUrl === "" || data.mapUrl === null) {
+        if (loc.mapUrl) {
+            await cleanupTrackedImage(userId, loc.mapUrl);
+        }
+        finalMapUrl = null;
     }
 
     const oldLoc = await prisma.location.findUnique({ where: { id }, select: { storyId: true } });
 
-    const { parentId, ...updateData } = data;
+    const updateData = { ...data };
+    delete updateData.parentId;
 
     const updatedLoc = await prisma.location.update({
         where: { id },
         data: {
             ...updateData,
-            parentId: parentId && parentId !== "none" ? parentId : null,
+            parentId,
             imageUrl: finalImageUrl,
             mapUrl: finalMapUrl
         }
@@ -1367,31 +1475,8 @@ export async function deleteLocation(id: string) {
     const loc = await requireOwnedLocation(id);
     const userId = await requireUserId();
 
-    const urlsToClean = [loc.imageUrl, loc.mapUrl].filter(Boolean) as string[];
-    for (const url of urlsToClean) {
-        const fileRecord = await prisma.uploadedFile.findUnique({
-            where: { url }
-        });
-        if (fileRecord) {
-            try {
-                const parts = url.split("/storack/");
-                if (parts.length > 1) {
-                    const pathWithExtension = "storack/" + parts[1];
-                    const publicId = pathWithExtension.split(".")[0];
-                    await cloudinary.uploader.destroy(publicId);
-                }
-            } catch (err) {
-                console.error(err);
-            }
-            await prisma.$transaction([
-                prisma.uploadedFile.delete({ where: { id: fileRecord.id } }),
-                prisma.user.update({
-                    where: { id: userId },
-                    data: { storageUsedBytes: { decrement: fileRecord.size } }
-                })
-            ]);
-        }
-    }
+    if (loc.imageUrl) await cleanupTrackedImage(userId, loc.imageUrl);
+    if (loc.mapUrl) await cleanupTrackedImage(userId, loc.mapUrl);
 
     await prisma.location.delete({ where: { id } });
     revalidatePath("/world");
@@ -1471,11 +1556,11 @@ export async function createFaction(worldId: string, data: { name: string, type?
     return faction;
 }
 
-export async function updateFaction(id: string, data: Partial<{ name: string, type: string, description: string, imageUrl: string, storyId: string | null }>) {
+export async function updateFaction(id: string, data: Partial<{ name: string, type: string, description: string, imageUrl: string | null, storyId: string | null }>) {
     const faction = await requireOwnedOrganization(id);
     const userId = await requireUserId();
 
-    let finalImageUrl = data.imageUrl;
+    let finalImageUrl: string | null | undefined = data.imageUrl;
     if (data.imageUrl && data.imageUrl.startsWith("data:")) {
         const upload = await handleImageUploadAndTracking(
             userId,
@@ -1485,6 +1570,11 @@ export async function updateFaction(id: string, data: Partial<{ name: string, ty
             `fac-img-${id}`
         );
         finalImageUrl = upload.url;
+    } else if (data.imageUrl === "" || data.imageUrl === null) {
+        if (faction.imageUrl) {
+            await cleanupTrackedImage(userId, faction.imageUrl);
+        }
+        finalImageUrl = null;
     }
 
     const updated = await prisma.organization.update({
@@ -1509,28 +1599,7 @@ export async function deleteFaction(id: string) {
     const userId = await requireUserId();
 
     if (faction.imageUrl) {
-        const fileRecord = await prisma.uploadedFile.findUnique({
-            where: { url: faction.imageUrl }
-        });
-        if (fileRecord) {
-            try {
-                const parts = faction.imageUrl.split("/storack/");
-                if (parts.length > 1) {
-                    const pathWithExtension = "storack/" + parts[1];
-                    const publicId = pathWithExtension.split(".")[0];
-                    await cloudinary.uploader.destroy(publicId);
-                }
-            } catch (err) {
-                console.error(err);
-            }
-            await prisma.$transaction([
-                prisma.uploadedFile.delete({ where: { id: fileRecord.id } }),
-                prisma.user.update({
-                    where: { id: userId },
-                    data: { storageUsedBytes: { decrement: fileRecord.size } }
-                })
-            ]);
-        }
+        await cleanupTrackedImage(userId, faction.imageUrl);
     }
 
     await prisma.organization.delete({ where: { id } });
@@ -1575,11 +1644,11 @@ export async function createLore(worldId: string, data: { name: string, category
     return lore;
 }
 
-export async function updateLore(id: string, data: Partial<{ name: string, category: string, description: string, referenceUrl: string, imageUrl: string, storyId: string | null }>) {
+export async function updateLore(id: string, data: Partial<{ name: string, category: string, description: string, referenceUrl: string, imageUrl: string | null, storyId: string | null }>) {
     const lore = await requireOwnedLore(id);
     const userId = await requireUserId();
 
-    let finalImageUrl = data.imageUrl;
+    let finalImageUrl: string | null | undefined = data.imageUrl;
     if (data.imageUrl && data.imageUrl.startsWith("data:")) {
         const upload = await handleImageUploadAndTracking(
             userId,
@@ -1589,6 +1658,11 @@ export async function updateLore(id: string, data: Partial<{ name: string, categ
             `lore-img-${id}`
         );
         finalImageUrl = upload.url;
+    } else if (data.imageUrl === "" || data.imageUrl === null) {
+        if (lore.imageUrl) {
+            await cleanupTrackedImage(userId, lore.imageUrl);
+        }
+        finalImageUrl = null;
     }
 
     const updated = await prisma.lore.update({
@@ -1613,28 +1687,7 @@ export async function deleteLore(id: string) {
     const userId = await requireUserId();
 
     if (lore.imageUrl) {
-        const fileRecord = await prisma.uploadedFile.findUnique({
-            where: { url: lore.imageUrl }
-        });
-        if (fileRecord) {
-            try {
-                const parts = lore.imageUrl.split("/storack/");
-                if (parts.length > 1) {
-                    const pathWithExtension = "storack/" + parts[1];
-                    const publicId = pathWithExtension.split(".")[0];
-                    await cloudinary.uploader.destroy(publicId);
-                }
-            } catch (err) {
-                console.error(err);
-            }
-            await prisma.$transaction([
-                prisma.uploadedFile.delete({ where: { id: fileRecord.id } }),
-                prisma.user.update({
-                    where: { id: userId },
-                    data: { storageUsedBytes: { decrement: fileRecord.size } }
-                })
-            ]);
-        }
+        await cleanupTrackedImage(userId, lore.imageUrl);
     }
 
     await prisma.lore.delete({ where: { id } });
@@ -1679,11 +1732,11 @@ export async function createWorldSystem(worldId: string, data: { name: string, c
     return system;
 }
 
-export async function updateWorldSystem(id: string, data: Partial<{ name: string, category: string, description: string, referenceUrl: string, imageUrl: string, storyId: string | null }>) {
+export async function updateWorldSystem(id: string, data: Partial<{ name: string, category: string, description: string, referenceUrl: string, imageUrl: string | null, storyId: string | null }>) {
     const system = await requireOwnedWorldSystem(id);
     const userId = await requireUserId();
 
-    let finalImageUrl = data.imageUrl;
+    let finalImageUrl: string | null | undefined = data.imageUrl;
     if (data.imageUrl && data.imageUrl.startsWith("data:")) {
         const upload = await handleImageUploadAndTracking(
             userId,
@@ -1693,6 +1746,11 @@ export async function updateWorldSystem(id: string, data: Partial<{ name: string
             `sys-img-${id}`
         );
         finalImageUrl = upload.url;
+    } else if (data.imageUrl === "" || data.imageUrl === null) {
+        if (system.imageUrl) {
+            await cleanupTrackedImage(userId, system.imageUrl);
+        }
+        finalImageUrl = null;
     }
 
     const updated = await prisma.worldSystem.update({
@@ -1717,28 +1775,7 @@ export async function deleteWorldSystem(id: string) {
     const userId = await requireUserId();
 
     if (system.imageUrl) {
-        const fileRecord = await prisma.uploadedFile.findUnique({
-            where: { url: system.imageUrl }
-        });
-        if (fileRecord) {
-            try {
-                const parts = system.imageUrl.split("/storack/");
-                if (parts.length > 1) {
-                    const pathWithExtension = "storack/" + parts[1];
-                    const publicId = pathWithExtension.split(".")[0];
-                    await cloudinary.uploader.destroy(publicId);
-                }
-            } catch (err) {
-                console.error(err);
-            }
-            await prisma.$transaction([
-                prisma.uploadedFile.delete({ where: { id: fileRecord.id } }),
-                prisma.user.update({
-                    where: { id: userId },
-                    data: { storageUsedBytes: { decrement: fileRecord.size } }
-                })
-            ]);
-        }
+        await cleanupTrackedImage(userId, system.imageUrl);
     }
 
     await prisma.worldSystem.delete({ where: { id } });
@@ -1783,11 +1820,11 @@ export async function createWorldObject(worldId: string, data: { name: string, c
     return obj;
 }
 
-export async function updateWorldObject(id: string, data: Partial<{ name: string, category: string, description: string, referenceUrl: string, imageUrl: string, storyId: string | null }>) {
+export async function updateWorldObject(id: string, data: Partial<{ name: string, category: string, description: string, referenceUrl: string, imageUrl: string | null, storyId: string | null }>) {
     const obj = await requireOwnedWorldObject(id);
     const userId = await requireUserId();
 
-    let finalImageUrl = data.imageUrl;
+    let finalImageUrl: string | null | undefined = data.imageUrl;
     if (data.imageUrl && data.imageUrl.startsWith("data:")) {
         const upload = await handleImageUploadAndTracking(
             userId,
@@ -1797,6 +1834,11 @@ export async function updateWorldObject(id: string, data: Partial<{ name: string
             `obj-img-${id}`
         );
         finalImageUrl = upload.url;
+    } else if (data.imageUrl === "" || data.imageUrl === null) {
+        if (obj.imageUrl) {
+            await cleanupTrackedImage(userId, obj.imageUrl);
+        }
+        finalImageUrl = null;
     }
 
     const updated = await prisma.worldObject.update({
@@ -1821,28 +1863,7 @@ export async function deleteWorldObject(id: string) {
     const userId = await requireUserId();
 
     if (obj.imageUrl) {
-        const fileRecord = await prisma.uploadedFile.findUnique({
-            where: { url: obj.imageUrl }
-        });
-        if (fileRecord) {
-            try {
-                const parts = obj.imageUrl.split("/storack/");
-                if (parts.length > 1) {
-                    const pathWithExtension = "storack/" + parts[1];
-                    const publicId = pathWithExtension.split(".")[0];
-                    await cloudinary.uploader.destroy(publicId);
-                }
-            } catch (err) {
-                console.error(err);
-            }
-            await prisma.$transaction([
-                prisma.uploadedFile.delete({ where: { id: fileRecord.id } }),
-                prisma.user.update({
-                    where: { id: userId },
-                    data: { storageUsedBytes: { decrement: fileRecord.size } }
-                })
-            ]);
-        }
+        await cleanupTrackedImage(userId, obj.imageUrl);
     }
 
     await prisma.worldObject.delete({ where: { id } });
@@ -1868,8 +1889,8 @@ export async function uploadStoryCover(id: string, formData: FormData) {
     let oldUploadedFileId = null;
 
     if (story.coverImage) {
-        const oldFileRecord = await prisma.uploadedFile.findUnique({
-            where: { url: story.coverImage }
+        const oldFileRecord = await prisma.uploadedFile.findFirst({
+            where: { url: story.coverImage, userId }
         });
         if (oldFileRecord) {
             oldFileSize = oldFileRecord.size;
@@ -2020,11 +2041,126 @@ export async function deleteUploadedFile(url: string) {
             where: { mapUrl: url, world: { userId } },
             data: { mapUrl: null }
         });
+        await tx.organization.updateMany({
+            where: { imageUrl: url, world: { userId } },
+            data: { imageUrl: null }
+        });
+        await tx.lore.updateMany({
+            where: { imageUrl: url, world: { userId } },
+            data: { imageUrl: null }
+        });
+        await tx.worldSystem.updateMany({
+            where: { imageUrl: url, world: { userId } },
+            data: { imageUrl: null }
+        });
+        await tx.worldObject.updateMany({
+            where: { imageUrl: url, world: { userId } },
+            data: { imageUrl: null }
+        });
+        await tx.characterSnapshot.updateMany({
+            where: { avatarUrl: url, character: { world: { userId } } },
+            data: { avatarUrl: null }
+        });
     });
 
     revalidatePath("/");
     revalidatePath("/settings");
     return { success: true };
+}
+
+export async function cleanupOrphanedFiles() {
+    const userId = await requireUserId();
+
+    const userFiles = await prisma.uploadedFile.findMany({
+        where: { userId }
+    });
+
+    if (userFiles.length === 0) return { success: true, count: 0, reclaimedBytes: 0 };
+
+    const [
+        characters,
+        snapshots,
+        locations,
+        factions,
+        lores,
+        systems,
+        objects,
+        stories,
+        user,
+        notes
+    ] = await Promise.all([
+        prisma.character.findMany({ where: { world: { userId } }, select: { avatarUrl: true } }),
+        prisma.characterSnapshot.findMany({ where: { character: { world: { userId } } }, select: { avatarUrl: true } }),
+        prisma.location.findMany({ where: { world: { userId } }, select: { imageUrl: true, mapUrl: true } }),
+        prisma.organization.findMany({ where: { world: { userId } }, select: { imageUrl: true } }),
+        prisma.lore.findMany({ where: { world: { userId } }, select: { imageUrl: true } }),
+        prisma.worldSystem.findMany({ where: { world: { userId } }, select: { imageUrl: true } }),
+        prisma.worldObject.findMany({ where: { world: { userId } }, select: { imageUrl: true } }),
+        prisma.story.findMany({ where: { world: { userId } }, select: { coverImage: true } }),
+        prisma.user.findUnique({ where: { id: userId }, select: { avatarUrl: true } }),
+        prisma.note.findMany({ where: { story: { world: { userId } } }, select: { fileUrl: true } })
+    ]);
+
+    const activeUrls = new Set<string>();
+    if (user?.avatarUrl) activeUrls.add(user.avatarUrl);
+    characters.forEach(c => c.avatarUrl && activeUrls.add(c.avatarUrl));
+    snapshots.forEach(s => s.avatarUrl && activeUrls.add(s.avatarUrl));
+    locations.forEach(l => {
+        if (l.imageUrl) activeUrls.add(l.imageUrl);
+        if (l.mapUrl) activeUrls.add(l.mapUrl);
+    });
+    factions.forEach(f => f.imageUrl && activeUrls.add(f.imageUrl));
+    lores.forEach(l => l.imageUrl && activeUrls.add(l.imageUrl));
+    systems.forEach(s => s.imageUrl && activeUrls.add(s.imageUrl));
+    objects.forEach(o => o.imageUrl && activeUrls.add(o.imageUrl));
+    stories.forEach(s => s.coverImage && activeUrls.add(s.coverImage));
+    notes.forEach(n => n.fileUrl && activeUrls.add(n.fileUrl));
+
+    const orphanedFiles = userFiles.filter(f => {
+        if (f.noteId) return false;
+        if (activeUrls.has(f.url)) return false;
+        const isEntityImage = f.url.includes("/storack/avatars/") ||
+            f.url.includes("/storack/locations/") ||
+            f.url.includes("/storack/factions/") ||
+            f.url.includes("/storack/lores/") ||
+            f.url.includes("/storack/systems/") ||
+            f.url.includes("/storack/objects/") ||
+            f.url.includes("/storack/covers/");
+        return isEntityImage;
+    });
+
+    let reclaimedBytes = 0;
+    for (const file of orphanedFiles) {
+        try {
+            const parts = file.url.split("/storack/");
+            if (parts.length > 1) {
+                const pathWithExtension = "storack/" + parts[1];
+                const publicId = pathWithExtension.split(".")[0];
+                await cloudinary.uploader.destroy(publicId);
+            }
+        } catch (err) {
+            console.error("Failed to delete orphaned image from Cloudinary:", err);
+        }
+        reclaimedBytes += file.size;
+    }
+
+    if (orphanedFiles.length > 0) {
+        const fileIds = orphanedFiles.map(f => f.id);
+        await prisma.$transaction([
+            prisma.uploadedFile.deleteMany({
+                where: { id: { in: fileIds } }
+            }),
+            prisma.user.update({
+                where: { id: userId },
+                data: {
+                    storageUsedBytes: { decrement: reclaimedBytes }
+                }
+            })
+        ]);
+    }
+
+    revalidatePath("/settings");
+    return { success: true, count: orphanedFiles.length, reclaimedBytes };
 }
 
 export async function updateChapterDates(id: string, dates: CustomDate[]) {
@@ -2144,8 +2280,8 @@ export async function deleteNote(id: string) {
     
     // Also include any legacy single file if present
     if (note.fileUrl) {
-        const fileRecord = await prisma.uploadedFile.findUnique({
-            where: { url: note.fileUrl }
+        const fileRecord = await prisma.uploadedFile.findFirst({
+            where: { url: note.fileUrl, userId }
         });
         if (fileRecord && !associatedFiles.some(f => f.id === fileRecord.id)) {
             associatedFiles.push(fileRecord);
@@ -2189,6 +2325,10 @@ export async function deleteNote(id: string) {
 export async function uploadResearchFile(storyId: string, noteId: string, formData: FormData) {
     try {
         const story = await requireOwnedStory(storyId);
+        const noteRecord = await requireOwnedNote(noteId);
+        if (noteRecord.storyId !== story.id) {
+            throw new Error("Note does not belong to the specified story");
+        }
         const userId = await requireUserId();
 
         const file = formData.get("file") as File;

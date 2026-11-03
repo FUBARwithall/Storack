@@ -76,7 +76,21 @@ import { ExportModal } from "@/components/ExportModal";
 import { VersionHistoryModal } from "@/components/editor/VersionHistoryModal";
 
 interface EditorClientProps {
-    story: { id: string; title: string; worldId: string; chapters: any[] };
+    story: {
+        id: string;
+        title: string;
+        worldId: string;
+        genre?: string | null;
+        synopsis?: string | null;
+        chapters: {
+            id: string;
+            title: string;
+            order: number;
+            wordCount: number;
+            status: string;
+            content: string | null;
+        }[];
+    };
     chapter: {
         id: string;
         title: string;
@@ -282,6 +296,17 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
 
     const handleSaveRef = useRef(handleSave);
     handleSaveRef.current = handleSave;
+
+    // Warn on tab close / navigation with unsaved changes
+    useEffect(() => {
+        const handler = (e: BeforeUnloadEvent) => {
+            if (hasChanges) {
+                e.preventDefault();
+            }
+        };
+        window.addEventListener('beforeunload', handler);
+        return () => window.removeEventListener('beforeunload', handler);
+    }, [hasChanges]);
 
     // Autosave countdown timer (5-minute countdown without keystroke resets)
     useEffect(() => {
@@ -887,8 +912,8 @@ export function EditorClient({ story, chapter: initialChapter }: EditorClientPro
                 story={{
                     id: story.id,
                     title: story.title,
-                    genre: (story as any).genre,
-                    synopsis: (story as any).synopsis,
+                    genre: story.genre,
+                    synopsis: story.synopsis,
                     chapters: story.chapters
                 }}
                 currentChapterId={initialChapter.id === 'new' ? undefined : initialChapter.id}

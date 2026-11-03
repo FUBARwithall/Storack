@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Users, MapPin, Search, Check, Info, Loader2, Save } from "lucide-react";
@@ -36,7 +36,6 @@ interface CastClientProps {
 
 export function CastClient({ story, chapter, availableCharacters, availableLocations }: CastClientProps) {
     const router = useRouter();
-    const [isPending, startTransition] = useTransition();
     const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
     // Track checked state locally

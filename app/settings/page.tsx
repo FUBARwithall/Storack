@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { User, Bell, Shield, Palette, Cloud, LogOut, Laptop, Moon, Sun, HardDrive } from "lucide-react";
+import { User, Bell, Palette, Cloud, LogOut, HardDrive } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { logoutAction } from "@/lib/auth-actions";
 import { ThemeSelector } from "./ThemeSelector";

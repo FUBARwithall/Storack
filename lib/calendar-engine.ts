@@ -80,6 +80,12 @@ export class CalendarEngine {
 
     constructor(config: CalendarConfig) {
         this.config = config;
+        if (!config.months || config.months.length === 0) {
+            throw new Error("Calendar must have at least one month");
+        }
+        if (config.months.some(m => m.days <= 0)) {
+            throw new Error("All months must have at least 1 day");
+        }
         this.totalDaysInYear = config.months.reduce((acc, month) => acc + month.days, 0);
     }
 
@@ -168,14 +174,19 @@ export class CalendarEngine {
             };
         }
 
+        if (totalDays <= 0) {
+            return { year: 1, monthIndex: 0, day: 1 };
+        }
+
         let remainingDays = totalDays;
         let year = 1;
 
-        // Determine Year
-        // Approximate jump calculation could be faster, but loop is safer for correctness first.
-        while (true) {
+        // Determine Year with maximum iteration guard
+        let yearIterations = 0;
+        const MAX_YEAR_ITERATIONS = 1000000;
+        while (yearIterations++ < MAX_YEAR_ITERATIONS) {
             const daysInThisYear = this.getDaysInYear(year);
-            if (remainingDays < daysInThisYear) {
+            if (daysInThisYear <= 0 || remainingDays < daysInThisYear) {
                 break;
             }
             remainingDays -= daysInThisYear;
@@ -184,15 +195,15 @@ export class CalendarEngine {
 
         // Determine Month
         let monthIndex = 0;
-        while (true) {
+        let monthIterations = 0;
+        while (monthIterations++ < this.config.months.length) {
             const daysInThisMonth = this.getDaysInMonth(monthIndex, year);
-            if (remainingDays < daysInThisMonth) {
+            if (daysInThisMonth <= 0 || remainingDays < daysInThisMonth) {
                 break;
             }
             remainingDays -= daysInThisMonth;
             monthIndex++;
             if (monthIndex >= this.config.months.length) {
-                // Should theoretically not happen if logic matches total days
                 break;
             }
         }
@@ -219,12 +230,14 @@ export class CalendarEngine {
             return this.config.weekDays[dayIndex].name;
         }
         const absDays = this.dateToAbsoluteDays(date);
-        const dayIndex = absDays % this.config.weekDays.length;
+        const weekLen = this.config.weekDays.length;
+        const dayIndex = ((absDays % weekLen) + weekLen) % weekLen;
         return this.config.weekDays[dayIndex].name;
     }
 
     // Get starting empty cells count for calendar rendering
     getStartOfMonthPadding(date: CustomDate): number {
+        if (this.config.weekDays.length === 0) return 0;
         if (this.isGregorianCalendar()) {
             const d = new Date(0);
             d.setUTCFullYear(date.year, date.monthIndex, 1);
@@ -232,7 +245,8 @@ export class CalendarEngine {
         }
         const firstDayDate = { year: date.year, monthIndex: date.monthIndex, day: 1 };
         const absDays = this.dateToAbsoluteDays(firstDayDate);
-        return absDays % this.config.weekDays.length;
+        const weekLen = this.config.weekDays.length;
+        return ((absDays % weekLen) + weekLen) % weekLen;
     }
 
     // Compare two dates: -1 if a < b, 0 if equal, 1 if a > b
